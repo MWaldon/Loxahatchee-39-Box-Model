@@ -1,0 +1,9 @@
+This folder contains the update for all SRSM input files.  Simulation period extended Jan-95 to Jun-09.
+
+-wr
+082109
+
+Error found in P input; G301 flows prior to 11-01-99 restored with non pref data.
+
+-wr
+090109
