@@ -1,0 +1,16 @@
+Version: 1.0
+ProjectId: 1d861fa1-c9c5-4044-8ec9-c00aff354706
+
+RestoreWorkspace: Default
+SaveWorkspace: Default
+AlwaysSaveHistory: Default
+
+EnableCodeIndexing: Yes
+UseSpacesForTab: Yes
+NumSpacesForTab: 2
+Encoding: UTF-8
+
+RnwWeave: Sweave
+LaTeX: pdfLaTeX
+
+ProjectName: 39Box_Model
