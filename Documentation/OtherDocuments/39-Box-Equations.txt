@@ -1,0 +1,1290 @@
+ {===============================================================================================}
+{=============  A.R.M. Loxahatchee Refuge Hydrodynamics and Water Quality Model                ======================}
+{=============                                      Multiple Cell Model,      version 1                            =========================}
+{===============================================================================================}
+
+{Version: for calibration & validation 2004-2010  Hamid Bazgirkhoob , July 2010}
+
+{This model was developed by scientists from the Center for Louisiana Inland Water Studies (CLIWS) at ULL}
+{Team members include Mike Waldon, Ehab Meselhe, William Roth, Tracy Chen and Hamid Bazgirkhoob }
+
+{Unit conversion: 1 g/m3 = 1 mg/L = 1 ppm, 1 ppb = 1 ug/L}
+
+{1. =====================================        Method         ==========================================}
+
+METHOD RK4
+
+STARTTIME = 3287
+STOPTIME  =  5843 ;for 2004-2010 2557 days, 
+DT              = 180/86400 {Note: for 9C model DT =0.005, but not work for 39C model, has to be <= 0.0025}
+DTOUT        = 1  ; changed for getting hourly average to compare with Mike flood Hamid March 16 2011
+
+day          = 1 + Time                         ;need to adjust this based upon timeseries format in *.CSV, the imported file
+Init_year   = 2004                               ;year value is given to STARTIME (years)
+Year         = Init_year + (Time/365.25)  ;useful for plotting in Madonna only ignores leap years may be off by 1 day (years)
+DayofYear = mod(TIME,365.25)           ;Julian day of year used in regulation schedule calculation
+
+{2. ==============================          Model parameters/constants        ==================================}
+{geometry}
+ncell  = 39             ;total number of cells,
+nc     = 11             ; number of canal cells
+nlinks = 52            ; number of links for link-node model
+
+{cell surface areas in square meters based on GIS estimation}
+{cells # 1 -11 are canal ones, 11-39 are marsh cells}
+area[1..ncell] = #areas(starttime,i)
+
+{HQ: min volume based on min depth}
+minvol[1..ncell] = mindepth*area[i]
+
+{For Water budget}
+Ecinit[1..nc]             = 5.10       ;initial canal stage (m) 
+Eminit[(1+nc)..ncell] = 5.09       ;initial marsh stage (m)
+
+Eoc[1..nc]             = #elevation(starttime,i)    ;canal bottom elevation (m) derived from talweg data from Tracy (in NGVD29)
+Eom[(1+nc)..ncell] = #elevation(starttime, i)   ;marsh bottom elevation (m) from GIS zonal statistics
+ 
+Eb = 3.5  ;water level outside refuge
+
+{keep seepage rates same as used in 2box model}
+lseep =  0.0484046            ;canal seepage constant (1/day) after optimization previous value(0.042) Hamid March 24 2011
+rseep = 8.16167e-10   ;marsh seepage constant (1/day) after optimization previous value (0.000131527) Hamid March 24 2011
+
+{HQ: use power law to compute exchange flow between pair-compartments, depending on nlinks below section}
+{based on # of links = 52, B[1]-B[52]} 
+{values: B1 = 450 for transport coefficient (1/m/day) canal-canal, B2 = 3 for canal-marsh, B3 = 15 for marsh-marsh}
+
+B1 = 6.97621 ; after optimization previous value(8.73) Hamid March 24 2011
+B2 = 1.13863 ; after optimization previous value(2.34) Hamid March 24 2011
+B3 = 4.55002 ; after optimization previous value(6.49) Hamid March 24 2011
+B[1..nc]        = B1
+B[12..22]      = B2
+B[23..nlinks] = B3
+
+Radius[1..nlinks] = #radius(starttime, i)     ;average length  for link#=1 calculated from centroild distance
+W[1..nlinks]        =#width(starttime, i)       ;average canal/marsh width (m) for link#1 estimated from length for marsh
+
+ETmin  = 0.20            ;minimum ET reduction factor for marsh
+Het      = 0.25            ;depth below which ET is reduced (m)
+evap     = 0.65           ;fraction of ET that is evaporation      After optimization Based on the discussion with Tracy we let it be as before 0.65 Hamid
+
+{depth (m)}
+mindepth        = 0.05   ;  minimum depth (m), avoids division by zero
+
+{use Volume-WL relationship derived from Tracy's model output cross-section: area-wl and distance btn each pair of cross section points}
+{0.9*vol not work, same results
+WL[1] = GRAPH(0.9*vol[1]) (0,2.44) (109561,4.35) (180205,4.6) (319280,4.91) (492127,5.29) (626207,5.59) (1000000,6.46)
+WL[2] = GRAPH(0.9*vol[2]) (0,0.98) (670680,4.2) (889907,4.52) (1138070,4.83) (1378288,5.1) (1922075,5.53) (2500000,6.1)
+WL[3] = GRAPH(0.9*vol[3]) (0,0.94) (1442755,4.2) (1888293,4.52) (2481404,4.83) (3210997,5.1) (4378221,5.49) (6000000,6.05)
+WL[4] = GRAPH(0.9*vol[4]) (0,0.50) (1883395,4.2) (2394839,4.5) (3153786,4.80) (4146342,5.08) (4729497,5.24) (8000000,6.40)
+WL[5] = GRAPH(0.9*vol[5]) (0,0.58) (763127,4.19) (961877,4.48) (1420093,4.79) (1887840,5.06) (4000000,6.2)
+WL[6] = GRAPH(0.9*vol[6]) (0,0.72) (423549,4.19) (588930,4.47) (892178,4.78) (1101904,5.0) (1170248,5.07) (2000000,6.06)
+WL[7] = GRAPH(0.9*vol[7]) (0,0.69) (495963,4.19) (707699,4.47) (1040966,4.78) (1273812,5.0) (1344158,5.07) (2500000,6.35)
+WL[8] = GRAPH(0.9*vol[8]) (0,-0.11) (1340167,4.18) (1722330,4.47) (2685638,4.78) (3617382,5.07) (8000000,6.55)
+WL[9] = GRAPH(0.9*vol[9]) (0,1.42) (835567,4.19) (1145059,4.47) (1860846,4.79) (2798622,5.07) (3329705,5.24) (5000000,5.8)
+WL[10] = GRAPH(0.9*vol[10]) (0,1.65) (821132,4.2) (1232077,4.49) (1715885,4.81) (2332065,5.08) (3319269,5.46) (6000000,6.5)
+WL[11] = GRAPH(0.9*vol[11]) (0,1.24) (405456,4.2) (528786,4.5) (703424,4.82) (899811,5.09) (1350604,5.52) (2000000,6.15)
+}
+
+WL[1] = GRAPH(vol[1]) (0,2.44) (109561,4.35) (180205,4.6) (319280,4.91) (492127,5.29) (626207,5.59) (1000000,6.46)
+WL[2] = GRAPH(vol[2]) (0,0.98) (670680,4.2) (889907,4.52) (1138070,4.83) (1378288,5.1) (1922075,5.53) (2500000,6.1)
+WL[3] = GRAPH(vol[3]) (0,0.94) (1442755,4.2) (1888293,4.52) (2481404,4.83) (3210997,5.1) (4378221,5.49) (6000000,6.05)
+WL[4] = GRAPH(vol[4]) (0,0.50) (1883395,4.2) (2394839,4.5) (3153786,4.80) (4146342,5.08) (4729497,5.24) (8000000,6.40)
+WL[5] = GRAPH(vol[5]) (0,0.58) (763127,4.19) (961877,4.48) (1420093,4.79) (1887840,5.06) (4000000,6.2)
+WL[6] = GRAPH(vol[6]) (0,0.72) (423549,4.19) (588930,4.47) (892178,4.78) (1101904,5.0) (1170248,5.07) (2000000,6.06)
+WL[7] = GRAPH(vol[7]) (0,0.69) (495963,4.19) (707699,4.47) (1040966,4.78) (1273812,5.0) (1344158,5.07) (2500000,6.35)
+WL[8] = GRAPH(vol[8]) (0,-0.11) (1340167,4.18) (1722330,4.47) (2685638,4.78) (3617382,5.07) (8000000,6.55)
+WL[9] = GRAPH(vol[9]) (0,1.42) (835567,4.19) (1145059,4.47) (1860846,4.79) (2798622,5.07) (3329705,5.24) (5000000,5.8)
+WL[10] = GRAPH(vol[10]) (0,1.65) (821132,4.2) (1232077,4.49) (1715885,4.81) (2332065,5.08) (3319269,5.46) (6000000,6.5)
+WL[11] = GRAPH(vol[11]) (0,1.24) (405456,4.2) (528786,4.5) (703424,4.82) (899811,5.09) (1350604,5.52) (2000000,6.15)
+
+
+depth[1..nc]            = max((WL[i]-Eoc[i]),mindepth)   ;based on volume-water level relationship developed from MIKE FLOOD model by Tracy
+depth[(1+nc)..ncell] = max(vol[i]/area[i], mindepth)     ;depth is used in reaction calculations and dispersion
+
+LIMIT vol >= 1 ;volume cannot be negative
+
+{import observations: stage}
+obs_g301 = #obs_stageall(day,1)
+obs_g310 = #obs_stageall(day,2)
+obs_s10e = #obs_stageall(day,3)
+obs_s10d = #obs_stageall(day,4)
+obs_s10c = #obs_stageall(day,5)
+obs_s10a = #obs_stageall(day,6)
+obs_s39  = #obs_stageall(day,7)
+obs_18c  = #obs_stageall(day,8)
+obs_g94d = #obs_stageall(day,9)
+obs_g300 = #obs_stageall(day,10)
+obs_north = #obs_stageall(day,13) + 0.42 ;orignal data have datum issue
+obs_south = #obs_stageall(day,14) + 0.52
+obs_aves7s9 = #obs_stageall(day,15)
+
+{import observations: CL concentration for 39 compartments}; optimization code modified by Hamid_ jan 28, 2011}
+ 
+obs_3cl= #CL_39compartments(day,1)
+obs_4cl= #CL_39compartments(day,2)
+obs_5cl= #CL_39compartments(day,3)
+obs_6cl= #CL_39compartments(day,4)
+obs_7cl= #CL_39compartments(day,5)
+obs_8cl= #CL_39compartments(day,6)
+obs_9cl= #CL_39compartments(day,7)
+obs_10cl= #CL_39compartments(day,8)
+obs_17cl= #CL_39compartments(day,9)
+obs_18cl= #CL_39compartments(day,10)
+obs_19cl= #CL_39compartments(day,11)
+obs_21cl= #CL_39compartments(day,12)
+obs_23cl= #CL_39compartments(day,13)
+obs_27cl= #CL_39compartments(day,14)
+obs_28cl= #CL_39compartments(day,15)
+obs_30cl= #CL_39compartments(day,16)
+obs_31cl= #CL_39compartments(day,17)
+obs_33cl= #CL_39compartments(day,18)
+obs_34cl= #CL_39compartments(day,19)
+obs_35cl= #CL_39compartments(day,20)
+obs_36cl= #CL_39compartments(day,21)
+obs_37cl= #CL_39compartments(day,22)
+obs_38cl= #CL_39compartments(day,23)
+obs_39cl= #CL_39compartments(day,24)
+
+
+{import observations: Se concentration for 4 compartments}; optimization code modified by Hamid Feb 4,2011}
+
+obs_9se=#Se_4compartment(day,1)
+obs_35se=#Se_4compartment(day,2)
+obs_37se=#Se_4compartment(day,3)
+obs_38se=#Se_4compartment(day,4)
+
+{For Water quality}
+nconstit   = 5
+cl            = 1       ;chloride; conservative
+so4         = 2       ;sulfate; apparent settling
+tp            = 3       ;total phosphorus, k-c* model
+so4eco    = 4       ;sulfate; monod relationship; ecolab
+dmsta_tp = 5       ;tp modeled with DMSTA equations
+
+{aerial deposition}
+Precip[cl] = 2.00                            ; mg/L, Chloride Concentration from Rainfall
+DDcl        = 1136  
+DD[cl]     = DDcl/365.25                  ; mg/m2-day, dry deposition of Chloride
+ 
+Precip[so4] = 1.00                          ; mg/L, SO4 Concentration from Rainfall
+DD[so4]      = 138.2/365.25             ; mg/m2-day, dry deposition of SO4
+
+Precip[tp]    = 0.010                       ; mg/L, TP Concentration from Rainfall
+DD[tp]         = 40/365.25                 ; mg/m2-day, dry deposition of Phosphorus
+
+Precip[so4eco]    = 1.00                 ; mg/L, so4eco Concentration from Rainfall
+DD[so4eco]         = 138.2/365.25    ; mg/m2-day, dry deposition of so4eco 
+
+Precip[dmsta_tp]  = 0.01                ; mg/L or g/m3
+DD[dmsta_tp]       = 40/365.25        ; mg/m2.day
+
+{Reaction parameters}
+{For SO4}
+{Settling rate in each cell, m/day}
+kso4[1..ncell] = #kso4set(starttime, i)
+
+{For so4eco}
+khalfSO4             = 0.650927                     ; g/m3       after optimization previous value ( 1 ) Hamid March 24 2011
+MaxSO4Removal = 0.074948     ; g/ m2-d       After optimization previous value ( 0.0394251 ) Hamid March 24 2011 optimized ( 0.074991)
+ 
+{For tp}
+ktp       = 16.8/365.25                    ; settling rate (m/day)
+cstarm = 0.008                             ; c* in marsh (mg/L or gm/m3)
+cstarc  = 0.080                             ; c* in canal (mg/L or gm/m3)
+
+{For DMSTA tp: Note: for details: http://wwwalker.net/dmsta/index.htm}
+{use two situations for K factors: EMG: emergent marsh; or PEW: preexistent wetland}
+{EMG: k1=0.1064; k2=0.002; k3=0.3192; PEW: k1 = 0.221,k2=0.0042,k3=0.6631}
+
+;EMG: please change TP initial below
+;maximum uptake rate
+K1 = (0.106/365.25)*1000              ;m3/g/day    ( before 0.1064)
+;recycle rate
+K2 = (0.002/365.25)*1000              ;m2/g/day 
+;burial rate
+K3 = 0.3191/365.25                       ;per day      (before 0.1092)
+
+{
+;PEW: please change TP initial below   
+;maximum uptake rate
+K1 = (0.221/365.25)*1000              ;m3/g/day    
+;recycle rate
+K2 = (0.0042/365.25)*1000              ;m2/g/day 
+;burial rate
+K3 = 0.6631/365.25                       ;per day
+}
+
+;Depth Multiplier **unitless
+Fz[(nc+1)..ncell] = GRAPH(depth[i]) (0,0) (0.4,1) (1,1) (2,0.2)
+
+;Concentration Multiplier **unitless
+Fc[dmsta_tp, (nc+1)..ncell] = 0.3/(conc[i, j]+0.3)
+
+;Uptake - Uptake of Phosphorus 
+Uptake[dmsta_tp, (nc+1)..ncell] = Fc[i, j]*Fz[j]*K1*dmsta_store[i, j]*conc[i, j]*area[j]   ; g/day for all cell area, not per unit as in DMSTA diagram
+
+;Release - Release (Recycle) of Phosphorus
+Release[dmsta_tp, (nc+1)..ncell] = K2*(dmsta_store[i, j]^2)*area[j]                            ; g/day                
+
+;Burial - Burial of Phosphorus into the sediment
+Burial[dmsta_tp, (nc+1)..ncell] = K3*dmsta_store[i, j]*area[j]                                      ; g/day
+
+;UptakePrM2 - Uptake of Phosphorus per sq.meter
+UpPrM2[dmsta_tp, (nc+1)..ncell] = Uptake[i, j]/area[j]                                               ; g/m2/day
+
+;ReleasePrM3 - Release (Recycle) of Phosphorus per cubic meter
+RelPrM3[dmsta_tp, (nc+1)..ncell] = Release[i, j]/vol[j]                                               ; g/m3/day
+
+;init dmsta_store[dmsta_tp, (nc+1)..ncell] =  0.1                                                        ;g/m2/day
+init dmsta_store[dmsta_tp, (nc+1)..ncell] =  #dmstastoreemg(starttime, j)                   ; new initial TP storage imported from Mike Flood for jan 1st 2004 Hamid 22nd Oct 2011
+;init dmsta_store[dmsta_tp, (nc+1)..ncell] =  #dmstastorepew(starttime, j) 
+
+;Biomass Storage differential equation (Storage is per unit area: g/m2 in DMSTA model)
+d/dt(dmsta_store[dmsta_tp, (nc+1)..ncell]) = upPrM2[i, j] - ((Release[i, j] + Burial[i, j])/area[j])        ;g/m2/day
+
+{3. ==============================        Import data time series (*.csv files)               ====================================}
+;_____FLOW STRUCTURES (UNITS m3/day counter-clockwise from southernmost)
+
+S39_out		= #OUTFLOW(day,1)
+G94A_out		= #OUTFLOW(day,2)
+G94B_out		= #OUTFLOW(day,3)
+G94C_out		= #OUTFLOW(day,4)
+G300_out 		= #OUTFLOW(day,5)
+S5AS_out		= #OUTFLOW(day,6)
+G301_out		= #OUTFLOW(day,7)
+G338_out		= #OUTFLOW(day,8)
+S10E_out 		= #OUTFLOW(day,9)
+S10D_out 		= #OUTFLOW(day,10)
+S10C_out 		= #OUTFLOW(day,11)
+S10A_out 		= #OUTFLOW(day,12)
+
+G94A_in		= #INFLOW(day,1)
+G94C_in		= #INFLOW(day,2)
+G94D_in		= #INFLOW(day,3); ACME2
+ACME1_in 		= #INFLOW(day,4)
+S362_in	 		= #INFLOW(day,5)
+G300_in 		= #INFLOW(day,6)
+S5AS_in 		= #INFLOW(day,7)
+S5A_in	 		= #INFLOW(day,8)
+G301_in 		= #INFLOW(day,9)
+G310_in		= #INFLOW(day,10)
+G251_in 		= #INFLOW(day,11)
+S6_in	 		= #INFLOW(day,12)
+G338_in 		= #INFLOW(day,13)
+
+;_____TOTAL FLOW (units m3/day) in three segaments
+
+QoutHistoric[1] 	=  0 
+QoutHistoric[2] 	=  G301_out  
+QoutHistoric[3] 	= 0 
+QoutHistoric[4] 	= S10E_out +G338_out
+QoutHistoric[5] 	= S10D_out 
+QoutHistoric[6] 	= S10C_out 
+QoutHistoric[7] 	=  S10A_out 
+QoutHistoric[8] 	= S39_out + G94A_out
+QoutHistoric[9] 	=  G94B_out + G94C_out 
+QoutHistoric[10] =  S5AS_out
+QoutHistoric[11] = G300_out 
+
+Qin[1] 	= 0  
+Qin[2] 	= G301_in
+Qin[3] 	= G310_in + G251_in
+Qin[4] 	= S6_in + G338_in
+Qin[5] 	= 0
+Qin[6] 	= 0
+Qin[7] 	= 0   
+Qin[8] 	= G94A_in 
+Qin[9] 	= G94C_in   
+Qin[10] 	= G94D_in + ACME1_in + S362_in 
+Qin[11] 	= G300_in + S5AS_in + S5A_in
+
+Qintot = arraysum(Qin[*])
+
+;REGULATION SCHEDULE (units m3/day)
+S10A_hurricane = #Regulation(day,1); release for 2006 and 2010 hurricane season
+S10C_hurricane = #Regulation(day,2); release for 2006 and 2010 hurricane season
+S10D_hurricane = #Regulation(day,3); release for 2006 and 2010 hurricane season
+QWaterSupply   = #Regulation(day,4); water supply releases from 1995 to 2010
+
+;_____CONCENTRATION (UNITS mg/L)
+G94A_TP 		= #TP(day,1); use values from G94B due to missing values
+G94C_TP 		= #TP(day,2); use values from G94B due to missing values
+G94D_TP 		= #TP(day,3)
+ACME1_TP	 	= #TP(day,4)
+S362_TP	 	= #TP(day,5)
+G300_TP 		= #TP(day,6)
+S5AS_TP 		= #TP(day,7)
+S5A_TP 		= #TP(day,8)
+G301_TP 		= #TP(day,9)
+G310_TP 		= #TP(day,10)
+G251_TP 		= #TP(day,11); Data from DBHYDRO ENR012
+S6_TP	 		= #TP(day,12)
+G338_TP	 	= #TP(day,13); no data for G338, use S6
+
+G94A_Cl 		= #Cl(day,1); use values from G94B due to missing values
+G94C_Cl 		= #Cl(day,2); use values from G94B due to missing values
+G94D_Cl 		= #Cl(day,3)
+ACME1_Cl	 	= #Cl(day,4)
+S362_Cl	 	= #Cl(day,5)
+G300_Cl 		= #Cl(day,6)
+S5AS_Cl 		= #Cl(day,7)
+S5A_Cl 		= #Cl(day,8)
+G301_Cl 		= #Cl(day,9)
+G310_Cl 		= #Cl(day,10)
+G251_Cl 		= #Cl(day,11); Data from DBHYDRO ENR012
+S6_Cl	 		= #Cl(day,12)
+G338_Cl	 	= #Cl(day,13); no data for G338
+
+G94A_SO4 		= #SO4(day,1); use values from G94B due to missing values
+G94C_SO4 		= #SO4(day,2); use values from G94B due to missing values
+G94D_SO4	 	= #SO4(day,3)
+ACME1_SO4	 	= #SO4(day,4)
+S362_SO4	 	= #SO4(day,5)
+G300_SO4 		= #SO4(day,6)
+S5AS_SO4 		= #SO4(day,7)
+S5A_SO4 		= #SO4(day,8)
+G301_SO4 		= #SO4(day,9); No SO4 data for G301
+G310_SO4 		= #SO4(day,10)
+G251_SO4 		= #SO4(day,11); Data from DBHYDRO ENR012
+S6_SO4 		= #SO4(day,12)
+G338_SO4 		= #SO4(day,13); no data for G338
+
+; Modified the code in  order to change the concentration to Rainfall for chloride, SO4, TP Hamid 5/20/2011
+
+;_____LOAD (UNITS = g/day)
+G94A_TPLOAD             = G94A_TP*G94A_in
+G94A_ClLOAD              = G94A_Cl*G94A_in
+G94A_SO4LOAD           = G94A_SO4*G94A_in
+
+G94C_TPLOAD 		= G94C_TP*G94C_in
+G94C_ClLOAD 		= G94C_Cl*G94C_in
+G94C_SO4LOAD 	= G94C_SO4*G94C_in
+
+G94D_TPLOAD 		= G94D_TP*G94D_in
+G94D_ClLOAD 		= G94D_Cl*G94D_in
+G94D_SO4LOAD 	= G94D_SO4*G94D_in
+
+ACME1_TPLOAD 	= ACME1_TP*ACME1_in
+ACME1_ClLOAD 	= ACME1_Cl*ACME1_in
+ACME1_SO4LOAD 	= ACME1_SO4*ACME1_in
+
+S362_TPLOAD 		= S362_TP*S362_in
+S362_ClLOAD 		= S362_Cl*S362_in
+S362_SO4LOAD	=S362_SO4*S362_in
+
+G300_TPLOAD		= G300_TP*G300_in
+G300_ClLOAD		= G300_Cl*G300_in
+G300_SO4LOAD	= G300_SO4*G300_in
+
+S5AS_TPLOAD		=S5AS_TP*S5AS_in
+S5AS_ClLOAD		= S5AS_Cl*S5AS_in
+S5AS_SO4LOAD	= S5AS_SO4*S5AS_in
+
+S5A_TPLOAD		= S5A_TP*S5A_in
+S5A_ClLOAD		= S5A_Cl*S5A_in
+S5A_SO4LOAD		= S5A_SO4*S5A_in
+
+G301_TPLOAD		= G301_TP*G301_in
+G301_ClLOAD		= G301_Cl*G301_in
+G301_SO4LOAD	= G301_SO4*G301_in
+
+G310_TPLOAD		= G310_TP*G310_in
+G310_ClLOAD		= G310_Cl*G310_in
+G310_SO4LOAD	= G310_SO4*G310_in
+
+G251_TPLOAD		= G251_TP*G251_in
+G251_ClLOAD		= G251_Cl*G251_in
+G251_SO4LOAD	= G251_SO4*G251_in
+
+S6_TPLOAD		= S6_TP*S6_in
+S6_ClLOAD		= S6_Cl*S6_in
+S6_SO4LOAD		= S6_SO4*S6_in
+
+G338_TPLOAD              = S6_TP*G338_in
+G338_ClLOAD               = S6_Cl*G338_in
+G338_SO4LOAD           = S6_SO4*G338_in
+
+;_____TOTAL LOAD (UNITS g/day)
+TPLOAD1   = 0
+TPLOAD2   = G301_TPLOAD
+TPLOAD3   = G310_TPLOAD + G251_TPLOAD
+TPLOAD4   = S6_TPLOAD + G338_TPLOAD 
+TPLOAD5   = 0 
+TPLOAD6   = 0
+TPLOAD7   = 0
+TPLOAD8   = G94A_TPLOAD
+TPLOAD9   = G94C_TPLOAD 
+TPLOAD10 = G94D_TPLOAD + ACME1_TPLOAD + S362_TPLOAD 
+TPLOAD11 = G300_TPLOAD + S5AS_TPLOAD + S5A_TPLOAD
+
+ClLOAD1   = 0
+ClLOAD2   = G301_ClLOAD 
+ClLOAD3   = G310_ClLOAD + G251_ClLOAD
+ClLOAD4   = S6_ClLOAD + G338_ClLOAD
+ClLOAD5   = 0 
+ClLOAD6   = 0
+ClLOAD7   = 0
+ClLOAD8   = G94A_ClLOAD
+ClLOAD9   = G94C_ClLOAD 
+ClLOAD10 = G94D_ClLOAD + ACME1_ClLOAD + S362_ClLOAD 
+ClLOAD11 = G300_ClLOAD + S5AS_ClLOAD + S5A_ClLOAD
+
+SO4LOAD1   =  0
+SO4LOAD2   = G301_SO4LOAD
+SO4LOAD3   = G310_SO4LOAD + G251_SO4LOAD
+SO4LOAD4   = S6_SO4LOAD + G338_SO4LOAD
+SO4LOAD5   = 0
+SO4LOAD6   = 0 
+SO4LOAD7   = 0
+SO4LOAD8   = G94A_SO4LOAD
+SO4LOAD9   = G94C_SO4LOAD 
+SO4LOAD10 = G94D_SO4LOAD + ACME1_SO4LOAD + S362_SO4LOAD 
+SO4LOAD11 = G300_SO4LOAD + S5AS_SO4LOAD + S5A_SO4LOAD
+
+{HQ: for use in estimate net canal structure load later}
+LOAD[cl,1] = ClLOAD1
+LOAD[cl,2] = ClLOAD2
+LOAD[cl,3] = ClLOAD3
+LOAD[cl,4] = ClLOAD4
+LOAD[cl,5] = ClLOAD5
+LOAD[cl,6] = ClLOAD6
+LOAD[cl,7] = ClLOAD7
+LOAD[cl,8] = ClLOAD8
+LOAD[cl,9] = ClLOAD9
+LOAD[cl,10] = ClLOAD10
+LOAD[cl,11] = ClLOAD11
+
+LOAD[tp,1] = TPLOAD1
+LOAD[tp,2] = TPLOAD2
+LOAD[tp,3] = TPLOAD3
+LOAD[tp,4] = TPLOAD4
+LOAD[tp,5] = TPLOAD5
+LOAD[tp,6] = TPLOAD6
+LOAD[tp,7] = TPLOAD7
+LOAD[tp,8] = TPLOAD8
+LOAD[tp,9] = TPLOAD9
+LOAD[tp,10] = TPLOAD10
+LOAD[tp,11] = TPLOAD11
+
+LOAD[so4,1] = SO4LOAD1
+LOAD[so4,2] = SO4LOAD2
+LOAD[so4,3] = SO4LOAD3
+LOAD[so4,4] = SO4LOAD4
+LOAD[so4,5] = SO4LOAD5
+LOAD[so4,6] = SO4LOAD6
+LOAD[so4,7] = SO4LOAD7
+LOAD[so4,8] = SO4LOAD8
+LOAD[so4,9] = SO4LOAD9
+LOAD[so4,10] = SO4LOAD10
+LOAD[so4,11] = SO4LOAD11
+
+LOAD[dmsta_tp,1..nc] = LOAD[tp,j]
+LOAD[so4eco,1..nc] = LOAD[so4,j]
+
+;_____Precipitation and Evapotranspiration
+P   = #PET(TIME,1)
+ET = #PET(TIME,2)
+
+{4. ============================     Initial conditions and differential equations             =================================}
+D_C0[1..nc]            = Ecinit[i]  - Eoc[i]                        ;Initial Depth in Canal
+D_M0[(nc+1)..ncell] = Eminit[i] - Eom[i]                       ;Initial Depth in Marsh
+
+init vol[1..nc]            = D_C0[i]*area[i]                          ;initial canal volume (m3)
+init vol[(nc+1)..ncell] = D_M0[i]*area[i]                          ;initial volume for marsh cells (m3)
+
+d/dt(vol[1])   = (P - ET - Gc[1])*area[1] + (Qin[1] -Q[1]-Q[11] -Q[12] -QoutHistoric[1])     ;Rate of canal volume increase (m3/day)
+d/dt(vol[2])   = (P - ET - Gc[2])*area[2] + (Qin[2] +Q[1]-Q[2] -Q[13]  -QoutHistoric[2])     
+d/dt(vol[3])   = (P - ET - Gc[3])*area[3] + (Qin[3] +Q[2]-Q[3] -Q[14] -QoutHistoric[3])  
+d/dt(vol[4])   = (P - ET - Gc[4])*area[4] + (Qin[4] +Q[3]-Q[4] -Q[15] -QoutHistoric[4])     
+d/dt(vol[5])   = (P - ET - Gc[5])*area[5] + (Qin[5] +Q[4]-Q[5] -Q[16]  -Qout[5])                
+d/dt(vol[6])   = (P - ET - Gc[6])*area[6] + (Qin[6] +Q[5]-Q[6] -Q[17] -Qout[6])  
+d/dt(vol[7])   = (P - ET - Gc[7])*area[7] + (Qin[7] +Q[6]-Q[7] -Q[18] -Qout[7])   
+d/dt(vol[8])   = (P - ET - Gc[8])*area[8] + (Qin[8] +Q[7]+Q[8]-Q[19] -Qout[8])                
+d/dt(vol[9])   = (P - ET - Gc[9])*area[9] + (Qin[9] +Q[9]-Q[8] -Q[20] -QoutHistoric[9])  
+d/dt(vol[10]) = (P - ET - Gc[10])*area[10] + (Qin[10] +Q[10]-Q[9] -Q[21] -QoutHistoric[10])    
+d/dt(vol[11]) = (P - ET - Gc[11])*area[11] + (Qin[11] +Q[11]-Q[10]-Q[22] -QoutHistoric[11])                
+
+d/dt(vol[12]) =  (P - ETm[12] - Gm[12])*area[12] +Q[12]-Q[23]                                    ;Rate of marsh volume increase (m3/day)
+d/dt(vol[13]) =  (P - ETm[13] - Gm[13])*area[13] +Q[23]-Q[34]-Q[35]                           ;based on exchange flows (link-node map)     
+d/dt(vol[14]) =  (P - ETm[14] - Gm[14])*area[14] +Q[13]-Q[24]                             
+d/dt(vol[15]) =  (P - ETm[15] - Gm[15])*area[15] +Q[24]-Q[36]                           
+d/dt(vol[16]) =  (P - ETm[16] - Gm[16])*area[16] +Q[14]-Q[25]                                  
+d/dt(vol[17]) =  (P - ETm[17] - Gm[17])*area[17] +Q[25]-Q[37]                             
+d/dt(vol[18]) =  (P - ETm[18] - Gm[18])*area[18] +Q[15]-Q[26]                                    
+d/dt(vol[19]) =  (P - ETm[19] - Gm[19])*area[19] +Q[26]-Q[38]                             
+d/dt(vol[20]) =  (P - ETm[20] - Gm[20])*area[20] +Q[16]-Q[27]                                            
+d/dt(vol[21]) =  (P - ETm[21] - Gm[21])*area[21] +Q[27]-Q[39]                               
+d/dt(vol[22]) =  (P - ETm[22] - Gm[22])*area[22] +Q[17]-Q[28]                             
+d/dt(vol[23]) =  (P - ETm[23] - Gm[23])*area[23] +Q[28]-Q[40]                    
+d/dt(vol[24]) =  (P - ETm[24] - Gm[24])*area[24] +Q[18]-Q[29]                                 
+d/dt(vol[25]) =  (P - ETm[25] - Gm[25])*area[25] +Q[29]-Q[41]                                 
+d/dt(vol[26]) =  (P - ETm[26] - Gm[26])*area[26] +Q[19]-Q[30]                                           
+d/dt(vol[27]) =  (P - ETm[27] - Gm[27])*area[27] +Q[30]-Q[42]                        
+d/dt(vol[28]) =  (P - ETm[28] - Gm[28])*area[28] +Q[20]-Q[31]                                  
+d/dt(vol[29]) =  (P - ETm[29] - Gm[29])*area[29] +Q[31]-Q[43]                            
+d/dt(vol[30]) =  (P - ETm[30] - Gm[30])*area[30] +Q[21]-Q[32]                                  
+d/dt(vol[31]) =  (P - ETm[31] - Gm[31])*area[31] +Q[32]-Q[44]                    
+d/dt(vol[32]) =  (P - ETm[32] - Gm[32])*area[32] +Q[22]-Q[33]                                    
+d/dt(vol[33]) =  (P - ETm[33] - Gm[33])*area[33] +Q[33]-Q[45]                    
+d/dt(vol[34]) =  (P - ETm[34] - Gm[34])*area[34] +Q[34] +Q[36] +Q[37]-Q[46] -Q[50]                                  
+d/dt(vol[35]) =  (P - ETm[35] - Gm[35])*area[35] +Q[35]+Q[44]+Q[45]+Q[50]-Q[48]                              
+d/dt(vol[36]) =  (P - ETm[36] - Gm[36])*area[36] +Q[38]+Q[46]-Q[47]-Q[51]                                   
+d/dt(vol[37]) =  (P - ETm[37] - Gm[37])*area[37] +Q[43]+Q[48]+Q[51]-Q[49]                                   
+d/dt(vol[38]) =  (P - ETm[38] - Gm[38])*area[38] +Q[39]+Q[40]+Q[41]+Q[47]-Q[52]                                            
+d/dt(vol[39]) =  (P - ETm[39] - Gm[39])*area[39] +Q[42]+Q[49]+Q[52]                              
+
+{set initial concentrations here, mass is calculated, see note for detail estimation}
+{read in initial concentrations, mg/L =g/m3}
+
+init_cl[1..ncell]    = #iniconc_cl(starttime,i)
+init_tp[1..ncell]    = #iniconc_tp(starttime,i)
+init_so4[1..ncell] = #iniconc_so4(starttime,i)
+
+{mass (g) in cells is initial depth * area * initial concentration (note concentration is mg/L = g/m3)}
+init mass[cl,1..nc]                    = D_C0[j]*area[j]*init_cl[j]
+init mass[cl,(nc+1)..ncell]         = D_M0[j]*area[j]*init_cl[j]
+
+init mass[so4,1..nc]                 = D_C0[j]*area[j]*init_so4[j]
+init mass[so4,(nc+1)..ncell]      = D_M0[j]*area[j]*init_so4[j]
+
+init mass[tp,1..nc]                   = D_C0[j]*area[j]*init_tp[j]
+init mass[tp,(nc+1)..ncell]         = D_M0[j]*area[j]*init_tp[j]
+
+init mass[so4eco,1..nc]            = D_C0[j]*area[j]*init_so4[j]
+init mass[so4eco,(nc+1)..ncell] = D_M0[j]*area[j]*init_so4[j]
+
+init mass[dmsta_tp,1..nc]            = D_C0[j]*area[j]*init_tp[j]
+init mass[dmsta_tp,(nc+1)..ncell] = D_M0[j]*area[j]*init_tp[j]
+
+
+{HQ: define sum of qload and dload based on exchange link-node relation in order to use universal equation for mass d/dt for each cell later}
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+qdload[1..nconstit,1] =  -qload[i,1]-qload[i,11]-qload[i,12] -dload[i,1]-dload[i,11]-dload[i,12]   
+qdload[1..nconstit,2..7] =  qload[i,(j-1)]-qload[i,j]-qload[i,(j+11)] +dload[i,(j-1)]-dload[i,j]-dload[i,(j+11)]     
+qdload[1..nconstit,8] =  qload[i,7]+qload[i,8]-qload[i,19] +  dload[i,7]+dload[i,8]-dload[i,19]         
+qdload[1..nconstit,9..11] =  qload[i,j]-qload[i,(j-1)]-qload[i,(j+11)] +  dload[i,j]-dload[i,(j-1)]-dload[i,(j+11)]         
+
+qdload[1..nconstit,12] =  qload[i,12]-qload[i,23] +  dload[i,12]-dload[i,23]         
+qdload[1..nconstit,13] =  qload[i,23]-qload[i,34]-qload[i,35] +  dload[i,23]-dload[i,34]-dload[i,35]         
+qdload[1..nconstit,14] =  qload[i,13]-qload[i,24] +  dload[i,13]-dload[i,24]         
+qdload[1..nconstit,15] =  qload[i,24]-qload[i,36]+  dload[i,24]-dload[i,36]         
+qdload[1..nconstit,16] =  qload[i,14]-qload[i,25] +  dload[i,14]-dload[i,25]         
+qdload[1..nconstit,17] =  qload[i,25]-qload[i,37]+  dload[i,25]-dload[i,37]         
+qdload[1..nconstit,18] =  qload[i,15]-qload[i,26] +  dload[i,15]-dload[i,26]         
+qdload[1..nconstit,19] =  qload[i,26]-qload[i,38]+  dload[i,26]-dload[i,38]         
+qdload[1..nconstit,20] =  qload[i,16]-qload[i,27] +  dload[i,16]-dload[i,27]   
+qdload[1..nconstit,21] =  qload[i,27]-qload[i,39]+  dload[i,27]-dload[i,39]    
+qdload[1..nconstit,22] =  qload[i,17]-qload[i,28] +  dload[i,17]-dload[i,28] 
+qdload[1..nconstit,23] =  qload[i,28]-qload[i,40]+  dload[i,28]-dload[i,40]         
+qdload[1..nconstit,24] =  qload[i,18]-qload[i,29] +  dload[i,18]-dload[i,29]  
+qdload[1..nconstit,25] =  qload[i,29]-qload[i,41]+  dload[i,29]-dload[i,41]                                
+qdload[1..nconstit,26] =  qload[i,19]-qload[i,30] +  dload[i,19]-dload[i,30]  
+qdload[1..nconstit,27] =  qload[i,30]-qload[i,42]+  dload[i,30]-dload[i,42]         
+qdload[1..nconstit,28] =  qload[i,20]-qload[i,31] +  dload[i,20]-dload[i,31]         
+qdload[1..nconstit,29] =  qload[i,31]-qload[i,43]+  dload[i,31]-dload[i,43]                            
+qdload[1..nconstit,30] =  qload[i,21]-qload[i,32] +  dload[i,21]-dload[i,32]         
+qdload[1..nconstit,31] =  qload[i,32]-qload[i,44]+  dload[i,32]-dload[i,44]                              
+qdload[1..nconstit,32] =  qload[i,22]-qload[i,33] +  dload[i,22]-dload[i,33]         
+qdload[1..nconstit,33] =  qload[i,33]-qload[i,45]+  dload[i,33]-dload[i,45]         
+qdload[1..nconstit,34] =  qload[i,34]+qload[i,36]+qload[i,37]-qload[i,46]-qload[i,50] + dload[i,34]+dload[i,36]+dload[i,37]-dload[i,46]-dload[i,50] 
+qdload[1..nconstit,35] =  qload[i,35]+qload[i,44]+qload[i,45]+qload[i,50]-qload[i,48] + dload[i,35]+dload[i,44]+dload[i,45]+dload[i,50]-dload[i,48]                                
+qdload[1..nconstit,36] =  qload[i,38]+qload[i,46]-qload[i,47]-qload[i,51] + dload[i,38]+dload[i,46]-dload[i,47]-dload[i,51]                            
+qdload[1..nconstit,37] =  qload[i,43]+qload[i,48]+qload[i,51]-qload[i,49] + dload[i,43]+dload[i,48]+dload[i,51]-dload[i,49]
+qdload[1..nconstit,38] =  qload[i,39]+qload[i,40]+qload[i,41]+qload[i,47]-qload[i,52] +  dload[i,39]+dload[i,40]+dload[i,41]+dload[i,47]-dload[i,52]                        
+qdload[1..nconstit,39] =  qload[i,42]+qload[i,49]+qload[i,52] +  dload[i,42]+dload[i,49]+dload[i,52]                       
+                                               
+{-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+{Canal cells}
+;  Canals --- structure load + flow (advective) load + dispersive load + aerial load - groundwater load + reactive loads
+d/dt(mass[1..nconstit, 1..nc]) = sload[i,j] + qdload[i, j] + aload[i, j] - gload[i, j] + rload[i, j]
+
+{marsh cells --- flow (advective) load + dispersive load + aerial load - groundwater load for each constituent + reactive loads}
+d/dt(mass[1..nconstit, (nc+1)..ncell]) =  qdload[i, j] + aload[i, j] - gload[i, j] + rload[i, j]
+
+
+{5. =======================================          Calculations       ==============================================}
+
+{5.1---------------------------------------------------------------- Volume calaulation ----------------------------------------------------------}
+
+{For ET}
+ETm[(nc+1)..ncell]     = cor_ET[i]                                      ;ETm = corrected ET in marsh (m/day)
+cor_ET[(nc+1)..ncell] = Fet[i] *ET                                     ;cor_ET = corrected ET (m/day)
+Fet[(nc+1)..ncell]      = MAX(ETmin, MIN(1, (Hm[i]/Het)))    ;Fet = reduction factor for marsh ET (dimensionless)
+Hm[(nc+1)..ncell]      = MAX(0, (Em[i] - Eom[i]))                 ;Hm = marsh water depth (m)
+transp  = 1-evap                                                              ;fraction of ET that is transpired
+
+; define flow connections, + flow from up to down
+; define links-nodes
+;up/dn[link#] = node#
+; nlinks = 52 (defined before)
+; import from two files for up/down values based on the link-node map: linkup and linkdn, so has to prepare the two csv files before run the code
+dn[1..nlinks] = #linkdn(starttime, i)
+up[1..nlinks] = #linkup(starttime, i)
+
+{For Qmc estimation}
+Q[1..nlinks] =  (10^7)*B[i]*W[i]*(depth[dn[i]]^3)*(E[up[i]]-E[dn[i]])/Radius[i]
+
+{HQ: Below is used for estimating exchange flow, so cannot delete}
+E[1] = Ec[1]
+E[2] = Ec[2]
+E[3] = Ec[3]
+E[4] = Ec[4]
+E[5] = Ec[5]
+E[6] = Ec[6]
+E[7] = Ec[7]
+E[8] = Ec[8]
+E[9] = Ec[9]
+E[10] = Ec[10]
+E[11] = Ec[11]
+
+E[12] = Em[12]
+E[13] = Em[13]
+E[14] = Em[14]
+E[15] = Em[15]
+E[16] = Em[16]
+E[17] = Em[17]
+E[18] = Em[18]
+E[19] = Em[19]
+E[20] = Em[20]
+E[21] = Em[21]
+E[22] = Em[22]
+E[23] = Em[23]
+E[24] = Em[24]
+E[25] = Em[25]
+E[26] = Em[26]
+E[27] = Em[27]
+E[28] = Em[28]
+E[29] = Em[29]
+E[30] = Em[30]
+E[31] = Em[31]
+E[32] = Em[32]
+E[33] = Em[33]
+E[34] = Em[34]
+E[35] = Em[35]
+E[36] = Em[36]
+E[37] = Em[37]
+E[38] = Em[38]
+E[39] = Em[39]
+
+{for calibration}
+E1 = E[1]
+E2 = E[2]
+E3 = E[3]
+E4 = E[4]
+E5 = E[5]
+E6 = E[6]
+E7 = E[7]
+E8 = E[8]
+E9 = E[9]
+E10 = E[10]
+E11 = E[11]
+
+E12 = E[12]
+E13 = E[13]
+E14 = E[14]
+E15 = E[15]
+E16 = E[16]
+E17 = E[17]
+E18 = E[18]
+E19 = E[19]
+E20 = E[20]
+E21 = E[21]
+E22 = E[22]
+E23 = E[23]
+E24 = E[24]
+E25 = E[25]
+E26 = E[26]
+E27 = E[27]
+E28 = E[28]
+E29 = E[29]
+E30 = E[30]
+E31 = E[31]
+E32 = E[32]
+E33 = E[33]
+E34 = E[34]
+E35 = E[35]
+E36 = E[36]
+E37 = E[37]
+E38 = E[38]
+E39 = E[39]
+
+{Below is used for exporting daily average stage, not instaneous values}
+INIT aveE[1..ncell]  = 0.0
+d/dt(aveE[1..ncell]) = E[i]
+dailyE[1..ncell] = aveE[i] -DELAY(aveE[i],1)
+
+E1daily = dailyE[1]
+E2daily = dailyE[2]
+E3daily = dailyE[3]
+E4daily = dailyE[4]
+E5daily = dailyE[5]
+E6daily = dailyE[6]
+E7daily = dailyE[7]
+E8daily = dailyE[8]
+E9daily = dailyE[9]
+E10daily = dailyE[10]
+E11daily = dailyE[11]
+E12daily = dailyE[12]
+E13daily = dailyE[13]
+E14daily = dailyE[14]
+E15daily = dailyE[15]
+E16daily = dailyE[16]
+E17daily = dailyE[17]
+E18daily = dailyE[18]
+E19daily = dailyE[19]
+E20daily = dailyE[20]
+E21daily = dailyE[21]
+E22daily = dailyE[22]
+E23daily = dailyE[23]
+E24daily = dailyE[24]
+E25daily = dailyE[25]
+E26daily = dailyE[26]
+E27daily = dailyE[27]
+E28daily = dailyE[28]
+E29daily = dailyE[29]
+E30daily = dailyE[30]
+E31daily = dailyE[31]
+E32daily = dailyE[32]
+E33daily = dailyE[33]
+E34daily = dailyE[34]
+E35daily = dailyE[35]
+E36daily = dailyE[36]
+E37daily = dailyE[37]
+E38daily = dailyE[38]
+E39daily = dailyE[39]
+
+{For seepage}
+Gc[1..nc]             = lseep*(Ec[i] -  Eb)                              ;Gc = canal seepage loss (m/day)
+Gm[(nc+1)..ncell] = rseep*(Em[i] - Eb)                              ;Gm = marsh seepage loss (m/day)
+
+; canal seepage loss, m3/day
+SpC[1..nc] = Gc[i]*area[i]
+SpCanal = ARRAYSUM(SpC[*])
+
+; marsh seepage loss, m3/day
+SpM[(nc+1)..ncell] = Gm[i]*area[i]
+SpMarsh = ARRAYSUM(SpM[*])
+
+totalSeepage = SpCanal + SpMarsh
+
+{stage}
+Ec[1..nc]             = depth[i] + Eoc[i]
+Em[(nc+1)..ncell] = depth[i] + Eom[i]
+
+{5.2  -------------------------------------------------------------Regulation Schedule (based on MIKE codeing) -----------------------------------------------------------}
+{ define zones:}
+A1FloorFeet = GRAPH(DayofYear) (0,17.2) (132, 15.75) (188, 15.75) (267, 17.5) (334, 17.5) (366, 17.2)      ; Floor of A1 Zone (ft)
+BFloorFeet = 14                                            ; Floor of B Zone (ft)
+A1Floor = A1FloorFeet*0.3048                       ; A1 Floor (m)
+BFloor = BFloorFeet*0.3048                          ; B Floor (m)
+
+{ Regulatory Release Calculations:}
+; 3 options follow for regulatory release calculation
+; User must comment out all but one
+
+{========================================================================================================}
+; Set option for outflow 
+CalcQRo = 1        ; 0 - Use historic outflow 1 - Use calculated outflow
+
+{canals:  C5 (S10D), C6 (S10C), C7 (S10A), C8 (S39) are involved in regulation schedule}
+{only S39 has water supply when 18C WL < A1Floor}
+{keep historical outflow for C1, C2, C3, C4, C9, C10, and C11}
+Qout[5] = IF (CalcQRo = 0) THEN (QoutHistoric[5]) ELSE (QoutCalc[5] + S10D_hurricane)
+Qout[6] = IF (CalcQRo = 0) THEN (QoutHistoric[6]) ELSE (QoutCalc[6] + S10C_hurricane)
+Qout[7] = IF (CalcQRo = 0) THEN (QoutHistoric[7]) ELSE (QoutCalc[7] + S10A_hurricane)
+Qout[8] = IF (CalcQRo = 0) THEN (QoutHistoric[8]) ELSE (QoutCalc[8] + QWaterSupply)
+
+Qout5 = Qout[5]
+Qout6 = Qout[6]
+Qout7 = Qout[7]
+Qout8 = Qout[8]
+
+{total Qout, m3/day}
+QoutTotal = QoutHistoric[1] + QoutHistoric[2]+ QoutHistoric[3] + QoutHistoric[4]+ARRAYSUM(Qout[*]) +QoutHistoric[9] + QoutHistoric[10]+ QoutHistoric[11]
+
+{========================================================================================================}
+RSQfact = 1; Can be used in options 2 and 3 to reduce the intensity of the regulatory release (dimensionless)
+
+; Option 3 - Regulatory release (thousand m3/d) as a function of difference between stage and A1 zone floor (ft). 
+; This is based on historic S10 flow 1/1/1995 - 8/31/2007 initially copied from file CA1-elevations.xls 
+
+QoutCalcS10 = GRAPH((Ec[9]-A1Floor)/0.3048) (-1.3,0) (-1.2,32) (-1.1,113) (-1,64) (-0.9,94) (-0.8,148) (-0.7,311) (-0.6,238) (-0.5,175) (-0.4,328) (-0.3,288) (-0.2,450) (-0.1,765) (0,957) (0.1,1323) (0.2,2274) (0.3,3188) (0.4,2832) (0.5,4469) (0.6,5901) (0.7,7406) (0.8,6602) (0.9,6356) (1,8116)
+
+;Reduction factor & Scale up S10 regulatory flows by ratio of total regulatory release/S10, convert thousand m3/d to m3/d
+;QoutCalc[2] =RSQfact*(196.7/144.8)*1000*QoutCalcS10                                            ;(m3/day)
+;HQ: according S10A:C:D:S39 = 1:1:1:1.07 from Tracy to sperate regulatory release for each related canal segement
+
+QoutCalc[5..7] = 0.2457*RSQfact*(196.7/144.8)*1000*QoutCalcS10                             ;(m3/day)
+QoutCalc[8] = 0.2629*RSQfact*(196.7/144.8)*1000*QoutCalcS10                                 ;(m3/day)
+
+QoutCalc5 = QoutCalc[5]
+QoutCalc6 = QoutCalc[6]
+QoutCalc7 = QoutCalc[7]
+QoutCalc8 = QoutCalc[8]
+
+{Below is used for exporting daily average outflow, not instaneous values}
+{
+INIT aveQoutCalc5 = 0.0
+d/dt(aveQoutCalc5) = Qout5
+dailyQoutCalc5 = aveQoutCalc5 -DELAY(aveQoutCalc5,1)
+}
+
+Daily_Qout5 = CONVEYOR(Qout5, 1) 
+Daily_Qout6 = CONVEYOR(Qout6, 1) 
+Daily_Qout7 = CONVEYOR(Qout7, 1) 
+Daily_Qout8 = CONVEYOR(Qout8, 1) 
+
+{5.3 ------------------------------------------------------------------- Mass calculation ---------------------------------------------------------------------------------------------------}
+
+{calculate advective loads for each flow connection, + load is with positive flow}
+{Note: based on flow + or -, define multiply which cell's concentration}
+{Q[link#)}
+qload[1..nconstit, 1..nlinks] = (max(q[ j], 0)*conc[i,up[ j]]) - (max(-q[ j], 0)*conc[i,dn[ j]])
+
+{dispersion parameters }
+{Jeanne's analysis, 2007 indicated that Longitudinal dispersion was calibrated to be equal to 22 m2/hr}
+{although when calibrating it was found that dispersion had very little effect in the canal and cell 1, and no effect in cells 2 and 3}
+; distance (or mixing length) for exchanges (m) (dispersion), same as Radius[i] used before for B factors
+;perimeters for exchanges (m), same as W[i] used before for B factors
+
+;areas for exchanges (m2) 
+exarea[1..nlinks] = W[i]*min(depth[dn[i]],depth[up[i]])
+
+; dispersion coefficient (m2/d),now 0.0061 m2/s from 22 m2/hr, so 528 m2/day
+; use Tracy's range and found 0.5m2s 43200 m2/day
+kd1 = 0 ;172800
+kd2 = 0; 172800
+kd3 = 43200; 172800
+
+{dispersion loads}
+;dload[1..nconstit, 1..nlinks] = 0
+dload[1..nconstit, 1..nc] = kd1*(exarea[j]/Radius[j])*(conc[i,up[j]]-conc[i,dn[j]])
+dload[1..nconstit, (nc+1)..22] = kd2*(exarea[j]/Radius[j])*(conc[i,up[j]]-conc[i,dn[j]])  
+dload[1..nconstit, 23..nlinks] = kd3*(exarea[j]/Radius[j])*(conc[i,up[j]]-conc[i,dn[j]])
+
+; aerial deposition
+aload[1..nconstit, 1..ncell] = area[ j]*((DD[i]/1000) + (precip[i]*P))
+
+; groundwater seepage + transpiration
+gload[1..nconstit, (nc+1)..ncell] = conc[i, j]*(Gm[j]+(transp*ET))*area[ j]    ; marsh seepage + transp load
+gload[1..nconstit, 1..nc]            =  conc[i, j]*Gc[j]*area[j]                        ; canal seepage load, no transpiration in canal
+
+; net canal structure inflow - outflow loads
+;sload[1..nconstit,1..nc]       = LOAD[i,j] - QoutHistoric[j]*conc[i, j]
+sload[1..nconstit,1..4]       = LOAD[i,j] - QoutHistoric[j]*conc[i, j]
+sload[1..nconstit,5]       = LOAD[i,5] - Qout[5]*conc[i, 5]
+sload[1..nconstit,6]       = LOAD[i,6] - Qout[6]*conc[i, 6]
+sload[1..nconstit,7]       = LOAD[i,7] - Qout[7]*conc[i, 7]
+sload[1..nconstit,8]       = LOAD[i,8] - Qout[8]*conc[i, 8]
+sload[1..nconstit,9..nc]       = LOAD[i,j] - QoutHistoric[j]*conc[i, j]
+
+; reactive loads (losses)
+rload[cl, 1..ncell] = 0        ; conservative
+
+rload[so4, (nc+1)..ncell] = -(kso4[j]/depth[j])*max(mass[i, j],0)     ; K-C* model,apparent settling, max protects from negative mass effect 
+rload[so4, 1..nc]            = 0
+
+rload[tp, (nc+1)..ncell] = -((ktp/depth[ j])*max(mass[i, j],0)) + ((ktp/depth[ j])*cstarm*vol[ j])    ; k-c* model, max prevents negative mass effects
+rload[tp, 1..nc]            = -((ktp/depth[ j])*max(mass[i, j],0)) + ((ktp/depth[ j])*cstarc*vol[ j])
+
+{Monod (or Michaelis-Menton equation: Disappearance rate g/m2.d = -Kmax(remove rate)*(Conc/(K1/2 + Conc))}
+{so, remove load = disap.rate g/m2.day * area m2 = g/day}
+rload[so4eco, (nc+1)..ncell] = -(MaxSO4Removal*area[j]) * conc[i, j]/(khalfSO4+conc[i, j])    ;g/day
+rload[so4eco, 1..nc]            = 0
+
+rload[dmsta_tp, (nc+1)..ncell] = Release[i, j] - Uptake[i, j]
+;rload[dmsta_tp, 1..nc]            =  0
+{HQ: Adding internal load of P from sediment of canal to reaction here for convienence, constant internal P load}
+; interP = 7.36/1000                 ;g/m2.day from Tracy
+; based on discussion with Mike on Dec. 3, 2008 from Tracy's Mike Flood Eco lab model, no internal P load is best
+;interP = 0.00025
+interP = 0.0
+
+rload[dmsta_tp, 1..nc]            =  interP*area[j]
+
+{5.4 ---------------------------------------------------Concentration calculation ---------------------------------------------------------------}
+{concentrations (mg/L = g/m3) are calculated from mass (g) and volume (m3)}
+{use max function to prevent negative c & division by zero or negative volume}
+{HQ: should use min vol below, not 1, but conc may over 1000}
+conc[1..nconstit, 1..ncell] = max(mass[i, j],0)/max(vol[j],minvol[j])
+
+{5.5 ---------------------------------------------------- Set Values to Graph ------------------------------------------------------------------}
+{Note: No TP store for Canal, otherwise, run time error}
+SDMSTA12 = dmsta_store[dmsta_tp,12]
+SDMSTA13 = dmsta_store[dmsta_tp,13]
+SDMSTA14 = dmsta_store[dmsta_tp,14]
+SDMSTA15 = dmsta_store[dmsta_tp,15]
+SDMSTA16 = dmsta_store[dmsta_tp,16]
+SDMSTA17 = dmsta_store[dmsta_tp,17]
+SDMSTA18 = dmsta_store[dmsta_tp,18]
+SDMSTA19 = dmsta_store[dmsta_tp,19]
+SDMSTA20 = dmsta_store[dmsta_tp,20]
+SDMSTA21 = dmsta_store[dmsta_tp,21]
+SDMSTA22 = dmsta_store[dmsta_tp,22]
+SDMSTA23 = dmsta_store[dmsta_tp,23]
+SDMSTA24 = dmsta_store[dmsta_tp,24]
+SDMSTA25 = dmsta_store[dmsta_tp,25]
+SDMSTA26 = dmsta_store[dmsta_tp,26]
+SDMSTA27 = dmsta_store[dmsta_tp,27]
+SDMSTA28 = dmsta_store[dmsta_tp,28]
+SDMSTA29 = dmsta_store[dmsta_tp,29]
+SDMSTA30 = dmsta_store[dmsta_tp,30]
+SDMSTA31 = dmsta_store[dmsta_tp,31]
+SDMSTA32 = dmsta_store[dmsta_tp,32]
+SDMSTA33 = dmsta_store[dmsta_tp,33]
+SDMSTA34 = dmsta_store[dmsta_tp,34]
+SDMSTA35 = dmsta_store[dmsta_tp,35]
+SDMSTA36 = dmsta_store[dmsta_tp,36]
+SDMSTA37 = dmsta_store[dmsta_tp,37]
+SDMSTA38 = dmsta_store[dmsta_tp,38]
+SDMSTA39 = dmsta_store[dmsta_tp,39]
+
+cl1 = conc[cl, 1]
+cl2 = conc[cl, 2]
+cl3 = conc[cl, 3]
+cl4 = conc[cl, 4]
+cl5 = conc[cl, 5]
+cl6 = conc[cl, 6]
+cl7 = conc[cl, 7]
+cl8 = conc[cl, 8]
+cl9 = conc[cl, 9]
+cl10 = conc[cl, 10]
+cl11 = conc[cl, 11]
+cl12 = conc[cl, 12]
+cl13 = conc[cl, 13]
+cl14 = conc[cl, 14]
+cl15 = conc[cl, 15]
+cl16 = conc[cl, 16]
+cl17 = conc[cl, 17]
+cl18 = conc[cl, 18]
+cl19 = conc[cl, 19]
+cl20 = conc[cl, 20]
+cl21 = conc[cl, 21]
+cl22 = conc[cl, 22]
+cl23 = conc[cl, 23]
+cl24 = conc[cl, 24]
+cl25 = conc[cl, 25]
+cl26 = conc[cl, 26]
+cl27 = conc[cl, 27]
+cl28 = conc[cl, 28]
+cl29 = conc[cl, 29]
+cl30 = conc[cl, 30]
+cl31 = conc[cl, 31]
+cl32 = conc[cl, 32]
+cl33 = conc[cl, 33]
+cl34 = conc[cl, 34]
+cl35 = conc[cl, 35]
+cl36 = conc[cl, 36]
+cl37 = conc[cl, 37]
+cl38 = conc[cl, 38]
+cl39 = conc[cl, 39]
+
+S1 = conc[so4, 1]
+S2 = conc[so4, 2]
+S3 = conc[so4, 3]
+S4 = conc[so4, 4]
+S5 = conc[so4, 5]
+S6 = conc[so4, 6]
+S7 = conc[so4, 7]
+S8 = conc[so4, 8]
+S9 = conc[so4, 9]
+S10 = conc[so4, 10]
+S11 = conc[so4, 11]
+S12 = conc[so4, 12]
+S13 = conc[so4, 13]
+S14 = conc[so4, 14]
+S15 = conc[so4, 15]
+S16 = conc[so4, 16]
+S17 = conc[so4, 17]
+S18 = conc[so4, 18]
+S19 = conc[so4, 19]
+S20 = conc[so4, 20]
+S21 = conc[so4, 21]
+S22 = conc[so4, 22]
+S23 = conc[so4, 23]
+S24 = conc[so4, 24]
+S25 = conc[so4, 25]
+S26 = conc[so4, 26]
+S27 = conc[so4, 27]
+S28 = conc[so4, 28]
+S29 = conc[so4, 29]
+S30 = conc[so4, 30]
+S31 = conc[so4, 31]
+S32 = conc[so4, 32]
+S33 = conc[so4, 33]
+S34 = conc[so4, 34]
+S35 = conc[so4, 35]
+S36 = conc[so4, 36]
+S37 = conc[so4, 37]
+S38 = conc[so4, 38]
+S39 = conc[so4, 39]
+
+tp1 = conc[tp, 1]
+tp2 = conc[tp, 2]
+tp3 = conc[tp, 3]
+tp4 = conc[tp, 4]
+tp5 = conc[tp, 5]
+tp6 = conc[tp, 6]
+tp7 = conc[tp, 7]
+tp8 = conc[tp, 8]
+tp9 = conc[tp, 9]
+tp10 = conc[tp, 10]
+tp11 = conc[tp, 11]
+tp12 = conc[tp, 12]
+tp13 = conc[tp, 13]
+tp14 = conc[tp, 14]
+tp15 = conc[tp, 15]
+tp16 = conc[tp, 16]
+tp17 = conc[tp, 17]
+tp18 = conc[tp, 18]
+tp19 = conc[tp, 19]
+tp20 = conc[tp, 20]
+tp21 = conc[tp, 21]
+tp22 = conc[tp, 22]
+tp23 = conc[tp, 23]
+tp24 = conc[tp, 24]
+tp25 = conc[tp, 25]
+tp26 = conc[tp, 26]
+tp27 = conc[tp, 27]
+tp28 = conc[tp, 28]
+tp29 = conc[tp, 29]
+tp30 = conc[tp, 30]
+tp31 = conc[tp, 31]
+tp32 = conc[tp, 32]
+tp33 = conc[tp, 33]
+tp34 = conc[tp, 34]
+tp35 = conc[tp, 35]
+tp36 = conc[tp, 36]
+tp37 = conc[tp, 37]
+tp38 = conc[tp, 38]
+tp39 = conc[tp, 39]
+
+Se1 = conc[so4eco, 1]
+Se2 = conc[so4eco, 2]
+Se3 = conc[so4eco, 3]
+Se4 = conc[so4eco, 4]
+Se5 = conc[so4eco, 5]
+Se6 = conc[so4eco, 6]
+Se7 = conc[so4eco, 7]
+Se8 = conc[so4eco, 8]
+Se9 = conc[so4eco, 9]
+Se10 = conc[so4eco, 10]
+Se11 = conc[so4eco, 11]
+Se12 = conc[so4eco, 12]
+Se13 = conc[so4eco, 13]
+Se14 = conc[so4eco, 14]
+Se15 = conc[so4eco, 15]
+Se16 = conc[so4eco, 16]
+Se17 = conc[so4eco, 17]
+Se18 = conc[so4eco, 18]
+Se19 = conc[so4eco, 19]
+Se20 = conc[so4eco, 20]
+Se21 = conc[so4eco, 21]
+Se22 = conc[so4eco, 22]
+Se23 = conc[so4eco, 23]
+Se24 = conc[so4eco, 24]
+Se25 = conc[so4eco, 25]
+Se26 = conc[so4eco, 26]
+Se27 = conc[so4eco, 27]
+Se28 = conc[so4eco, 28]
+Se29 = conc[so4eco, 29]
+Se30 = conc[so4eco, 30]
+Se31 = conc[so4eco, 31]
+Se32 = conc[so4eco, 32]
+Se33 = conc[so4eco, 33]
+Se34 = conc[so4eco, 34]
+Se35 = conc[so4eco, 35]
+Se36 = conc[so4eco, 36]
+Se37 = conc[so4eco, 37]
+Se38 = conc[so4eco, 38]
+Se39 = conc[so4eco, 39]
+
+TPDMSTA1 = conc[dmsta_tp,1]
+TPDMSTA2 = conc[dmsta_tp,2]
+TPDMSTA3 = conc[dmsta_tp,3]
+TPDMSTA4 = conc[dmsta_tp,4]
+TPDMSTA5 = conc[dmsta_tp,5]
+TPDMSTA6 = conc[dmsta_tp,6]
+TPDMSTA7 = conc[dmsta_tp,7]
+TPDMSTA8 = conc[dmsta_tp,8]
+TPDMSTA9 = conc[dmsta_tp,9]
+TPDMSTA10 = conc[dmsta_tp,10]
+TPDMSTA11 = conc[dmsta_tp,11]
+TPDMSTA12 = conc[dmsta_tp,12]
+TPDMSTA13 = conc[dmsta_tp,13]
+TPDMSTA14 = conc[dmsta_tp,14]
+TPDMSTA15 = conc[dmsta_tp,15]
+TPDMSTA16 = conc[dmsta_tp,16]
+TPDMSTA17 = conc[dmsta_tp,17]
+TPDMSTA18 = conc[dmsta_tp,18]
+TPDMSTA19 = conc[dmsta_tp,19]
+TPDMSTA20 = conc[dmsta_tp,20]
+TPDMSTA21 = conc[dmsta_tp,21]
+TPDMSTA22 = conc[dmsta_tp,22]
+TPDMSTA23 = conc[dmsta_tp,23]
+TPDMSTA24 = conc[dmsta_tp,24]
+TPDMSTA25 = conc[dmsta_tp,25]
+TPDMSTA26 = conc[dmsta_tp,26]
+TPDMSTA27 = conc[dmsta_tp,27]
+TPDMSTA28 = conc[dmsta_tp,28]
+TPDMSTA29 = conc[dmsta_tp,29]
+TPDMSTA30 = conc[dmsta_tp,30]
+TPDMSTA31 = conc[dmsta_tp,31]
+TPDMSTA32 = conc[dmsta_tp,32]
+TPDMSTA33 = conc[dmsta_tp,33]
+TPDMSTA34 = conc[dmsta_tp,34]
+TPDMSTA35 = conc[dmsta_tp,35]
+TPDMSTA36 = conc[dmsta_tp,36]
+TPDMSTA37 = conc[dmsta_tp,37]
+TPDMSTA38 = conc[dmsta_tp,38]
+TPDMSTA39 = conc[dmsta_tp,39]
+
+{==========================================          End of Code           =============================================}
+
+; Optmization code based on error for water stage wrote by Hamid Bazgirkhoob
+
+AbsError_9st=ABS(E9daily-Obs_18c)/4.902251882
+d/dt(IAE9st)=Abserror_9st
+INIT IAE9st=0
+
+AbsError_35st=ABS(E35daily-Obs_north)/4.992511978
+d/dt(IAE35st)=Abserror_35st
+INIT IAE35st=0
+
+AbsError_37st=ABS(E37daily-Obs_aves7s9)/4.95729
+d/dt(IAE37st)=Abserror_37st
+INIT IAE37st=0
+
+AbsError_38st=ABS(E38daily-Obs_south)/4.966167009
+d/dt(IAE38st)= Abserror_38st
+INIT IAE38st=0
+
+
+
+{============ Optimization code based on the sumation of error of sulfate and water stage for 4 compartments wrote by Hamid Bazgirkhoob, 2/25/2011    =================================}
+
+; opt code based on error for Se wrote by Hamid
+
+AbsError_9se = Abs(se9-Obs_9se)/26.8647059
+d/dt (IAE9se) = AbsError_9se
+INIT IAE9se=0
+
+
+AbsError_35se = Abs(se35-Obs_35se)/1.249657
+d/dt (IAE35se) = AbsError_35se
+INIT IAE35se=0
+
+
+AbsError_37se = Abs(se37-Obs_37se)/1.618971
+d/dt (IAE37se) = AbsError_37se
+INIT IAE37se=0
+
+AbsError_38se = Abs(se38-Obs_38se)/2.244318
+d/dt( IAE38se) = AbsError_38se
+INIT IAE38se=0
+
+SUM_IAE=IAE9se+IAE35se+IAE37se+IAE38se+IAE9st+IAE35st+IAE37st+IAE38st
+
+{============================================================================================================}
+
+; optimization code based on error for Cl wrote by Hamid
+
+;AbsError_3cl = ABS(cl3-Obs_3cl)
+;d/dt (IAE3cl) = AbsError_3cl
+;INIT IAE3cl = 0
+
+;AbsError_4cl=ABS(cl4-Obs_4cl)
+;d/dt (IAE4cl) = AbsError_4cl
+;INIT IAE4cl = 0
+
+;AbsError_5cl = ABS(cl5-Obs_5cl)
+;d/dt (IAE5cl) = AbsError_5cl
+;INIT IAE5cl = 0
+
+;AbsError_6cl = ABS(cl6-Obs_6cl)
+;d/dt (IAE6cl) = AbsError_6cl
+;INIT IAE6cl = 0
+
+;AbsError_7cl = ABS(cl7-Obs_7cl)
+;d/dt (IAE7cl) = AbsError_7cl
+;INIT IAE7cl = 0
+
+;AbsError_8cl = ABS(cl8-Obs_8cl)
+;d/dt (IAE8cl) = AbsError_8cl
+;INIT IAE8cl = 0
+
+;AbsError_9cl = ABS(cl9-Obs_9cl)
+;d/dt (IAE9cl) = AbsError_9cl
+;INIT IAE9cl = 0
+
+;AbsError_10cl = ABS(cl10-Obs_10cl)
+;d/dt (IAE10cl) = AbsError_10cl
+;INIT IAE10cl = 0
+
+;AbsError_17cl = ABS(cl17-Obs_17cl)
+;d/dt (IAE17cl) = AbsError_17cl
+;INIT IAE17cl = 0
+
+;AbsError_18cl = ABS(cl18-Obs_18cl)
+;d/dt (IAE18cl) = AbsError_18cl
+;INIT IAE18cl = 0
+
+;AbsError_19cl = ABS(cl19-Obs_19cl)
+;d/dt (IAE19cl) = AbsError_19cl
+;INIT IAE19cl = 0
+
+;AbsError_21cl = ABS(cl21-Obs_21cl)
+;d/dt (IAE21cl) = AbsError_21cl
+;INIT IAE21cl = 0
+
+;AbsError_23cl = ABS(cl23-Obs_23cl)
+;d/dt (IAE23cl) = AbsError_23cl
+;INIT IAE23cl = 0
+
+;AbsError_27cl = ABS(cl27-Obs_27cl)
+;d/dt (IAE27cl) = AbsError_27cl
+;INIT IAE27cl = 0
+
+;AbsError_28cl = ABS(cl28-Obs_28cl)
+;d/dt (IAE28cl) = AbsError_28cl
+;INIT IAE28cl = 0
+
+;AbsError_30cl = ABS(cl30-Obs_30cl)
+;d/dt (IAE30cl) = AbsError_30cl
+;INIT IAE30cl = 0
+
+;AbsError_31cl = ABS(cl31-Obs_31cl)
+;d/dt (IAE31cl) = AbsError_31cl
+;INIT IAE31cl = 0
+
+;AbsError_33cl = ABS(cl33-Obs_33cl)
+;d/dt (IAE33cl) = AbsError_33cl
+;INIT IAE33cl = 0
+
+;AbsError_34cl = ABS(cl34-Obs_34cl)
+;d/dt (IAE34cl) = AbsError_34cl
+;INIT IAE34cl = 0
+
+;AbsError_35cl = ABS(cl35-Obs_35cl)
+;d/dt (IAE35cl) = AbsError_35cl
+;INIT IAE35cl = 0
+
+;AbsError_36cl = ABS(cl36-Obs_36cl)
+;d/dt (IAE36cl) = AbsError_36cl
+;INIT IAE36cl = 0
+
+;AbsError_37cl = ABS(cl37-Obs_37cl)
+;d/dt (IAE37cl) = AbsError_37cl
+;INIT IAE37cl = 0
+
+;AbsError_38cl = ABS(cl38-Obs_38cl)
+;d/dt (IAE38cl) = AbsError_38cl
+;INIT IAE38cl = 0
+
+;AbsError_39cl = ABS(cl39-Obs_39cl)
+;d/dt (IAE39cl) = AbsError_39cl
+;INIT IAE39cl = 0
+
+
+{;SUM_IAEcl=IAE3cl+IAE4cl+IAE5cl+IAE6cl+IAE7cl+IAE8cl+IAE9cl+IAE10cl+IAE17cl+IAE18cl+IAE19cl+IAE21cl+IAE23cl+IAE27cl+IAE28cl+IAE30cl+IAE31cl+IAE33cl+IAE34cl+IAE35cl+IAE36cl+IAE37cl+IAE38cl;;+IAE39cl}
