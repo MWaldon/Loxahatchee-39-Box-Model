@@ -1,15 +1,19 @@
 # This R script sets model run constants needed for the 39-Box Mass/Concentration model
 
-# Constituent related constants
-evap     = 0.65       # fraction of ET that is evaporation
 # water column constituent index values
-nconstit   = 5 # number of constituents with simulated mass/concentration 
-cl         = 1 # chloride; conservative
-so4        = 2 # sulfate; apparent settling
-tp         = 3 # total phosphorus, k-c* model
-so4eco     = 4 # sulfate; monod relationship; ecolab
-dmsta_tp   = 5 # total phosphorus modeled with DMSTA equations
-cnames     = c('cl', 'so4', 'tp', 'so4eco', 'dmsta_tp')
+  nconstit   = 5 # number of constituents with simulated mass/concentration 
+  cl         = 1 # chloride; conservative
+  so4        = 2 # sulfate; apparent settling
+  tp         = 3 # total phosphorus, k-c* model
+  so4eco     = 4 # sulfate; monod relationship; ecolab
+  dmsta_tp   = 5 # total phosphorus modeled with DMSTA equations
+  cnames     = c('cl', 'so4', 'tp', 'so4eco', 'dmsta_tp')
+
+# run simulation for all constituents by default
+  constit.run <- rep(TRUE, nconstit) # run constituent simulation cl:dmsta_tp?
+
+# Constituent related constants
+  evap     = 0.65       # fraction of ET that is evaporation
 
 # aerial deposition
 Precip <- rep(NA,nconstit) # concentration in rainfall (mg/L)
