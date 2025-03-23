@@ -1,10 +1,10 @@
-# This script runs the 39-Box stage model
+# This script runs the 39-Box concentration/mass model
 
 # To reset the plot window to default settings and clear all plots 
 #   use command dev.off() in the console.
 
 # remove all variables from the environment except "filename"
-rm(list = ls()[! ls() %in% "filename"])
+# rm(list = ls()[! ls() %in% "filename"])
 
 # Load the base model
   # Load required dataframes created by script make_datasets.R
@@ -25,7 +25,7 @@ rm(list = ls()[! ls() %in% "filename"])
   if (exists("filename")) { # if the variable "filename" exists
     default_name <- filename
   } else {
-    default_name <- '39BoxBase' # file name for the base model run
+    default_name <- '39BoxBaseConc' # file name for the Conc base model run
   }
     user_prompt <- paste("Enter output filename (default is", default_name,"): ")
   user_input <- readline(prompt = user_prompt)
@@ -41,14 +41,14 @@ rm(list = ls()[! ls() %in% "filename"])
 
 # set the name of the main model script, 
   #  modify if a new branch or version of the model is being used
-  model.script <- "39BoxStage.R"
+  model.script <- "39BoxConc.R"
 
 # __________________________________________________________
 # On the following lines make any changes needed for the current scenario.
   # This may alter constants, loaded dataframes, or redefine functions.
-  # Example: To model the impact of increasing flow through the S39 by 20%
-  #   NonReg$S39 <- 1.2*NonReg$S39 
-  # Save this modified file with a new filename (i.e. not as runStage.R).
+  # Example: To model the impact of increasing Cl in rain by 20%
+  #   Precip[cl] <- 1.2*Precip[cl]
+  # Save this modified file with a new filename (i.e. not as runConc.R).
   
   
 
@@ -56,11 +56,11 @@ rm(list = ls()[! ls() %in% "filename"])
   
 # __________________________________________________________
 
-# run the stage model
+# run the Concentration model
   source(model.script)
 
 # run a standard set of graphics 
-  source('39BoxStageStdGraphs.R')
+  source('39BoxConcStdGraphs.R')
   
 # clean up
   rm(default_name, user_prompt, user_input, model.script)
