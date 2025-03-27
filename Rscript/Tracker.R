@@ -118,7 +118,11 @@ link.route <- function(linkn, dist) { # route the particle along the link
   link.len <- link.xy(linkn,0)['len']
   while (in.link) { # particle between link ends
     # take a step
-    time.next <-trunc(time.sim)+1 # time at end of day, also row number   
+    time.next <-trunc(time.sim)+1 # time at end of day, also row number
+    if (time.next>length(sim.Velocity[, linkn])) { 
+      # time has past the end of the simulation
+      return(0) # nextcell 0 flags time has passed the end of the simulation
+      }
     dt <- time.next - time.sim  # time step
     v <- sim.Velocity[time.next, linkn] # velocity (m/day)
     dx <- dt*v # distance moved (m), positive=downstream, negative=upstream
@@ -133,7 +137,6 @@ link.route <- function(linkn, dist) { # route the particle along the link
       ntracks <- length(track[,1])+1 # new track point
       track[ntracks,] <<- c(time.sim, xy['x'], xy['y'], linkn, d)
       
-      # print(c('time = ', time.sim)) # -------------------------------
     } # end if
   } # end while
   
@@ -174,49 +177,55 @@ for (i in 1:nlink) { # plot links
 
 nmax <- 100 # maximum number of cells entered before stop
 # Ask user for start date, default = Start.Date
-#  for now assume start time
-time.sim <- 0 # time (days)
+time.simin <- readline(
+  paste('Enter starting date for tracking (default=',
+        Start.Date,'): ', sep = ''))
+if (time.simin=='') {time.simin <- Start.Date}
+time.simin <- as.Date(time.simin)
+time.simin <- Date2Day(time.simin)
+time.simin <- Day2TIME(time.simin)
 
-# Ask user for cell number to "drop" particle
-nstart <- readline('Enter a starting cell number: ')
-nstart <- as.numeric(nstart) # convert to a number
-xy <- cell.xy((nstart))
-nc <- nstart # nc is the current cell number 
-
-points(xy['x'], xy['y'], col=startcolor, cex=3) # Display initial particle
-
-# initialize track dataframe
-track <- data.frame(time.sim, xy['x'], xy['y'], 0, 0)
-names(track) <- c('time', 'x', 'y', 'link', 'dist')
-
-# Loop until particle reaches the outflow (or maximum days is reached)
-  for (i in 1:nmax) { # main loop
-    xy <- cell.xy(nc)
-    cdrop <- cell.drop(nc)
-    linkn <- cdrop[1]
-    if (linkn==-1) { # outflow
-      print(paste('outflow of particle from cell ', nc, ' at time = ', time.sim))
-      lines(track$x, track$y, col=startcolor)
-      break
-      } # end if
-    if (linkn==0) {# no outflow
-      time.sim <- trunc(time.sim+1) # increment time
-      
-    } else { # send particle onto linkn
-        if (cdrop[2]==UP) { # start particle at upstream end
-          dist <- 0 # distance along the link =0
-        }
-        else { # particle is at the downstream end
-          dist <- link.xy(linkn,0)['len'] # at downstream end
-             } # end else
-        # route the particle along the link
-        nc <- link.route(linkn, dist) # returns next cell number as nc
-        } # end else
-    
-  } # end for i
-
-  # if distance moved is less than link length (link$Radius)
-    # display the particle
-  # else # particle moved past the end of the link into downstream cel
-    # cell.drop
-
+while(TRUE) { # until user ends the run 
+  time.sim <- time.simin
+  # Ask user for cell number to "drop" particle
+  nstart <- readline('Enter a starting cell number or enter to stop: ')
+  if (nstart=='') {break} # 
+  nstart <- as.numeric(nstart) # convert to a number
+  xy <- cell.xy((nstart))
+  nc <- nstart # nc is the current cell number 
+  
+  points(xy['x'], xy['y'], col=startcolor, cex=3) # Display initial particle
+  
+  # initialize track dataframe
+  track <- data.frame(time.sim, xy['x'], xy['y'], 0, 0)
+  names(track) <- c('time', 'x', 'y', 'link', 'dist')
+  
+  # Loop until particle reaches the outflow (or maximum cells is reached)
+    for (i in 1:nmax) { # main loop
+      xy <- cell.xy(nc)
+      cdrop <- cell.drop(nc)
+      linkn <- cdrop[1]
+      if (linkn==-1) { # outflow
+        print(paste('outflow of particle from cell ', nc, ' on date = ',
+                    Day2Date(time.sim+1)))
+        lines(track$x, track$y, col=startcolor)
+        break
+        } # end if
+      if (linkn==0) {# no outflow
+        time.sim <- trunc(time.sim+1) # increment time
+        
+      } else { # send particle onto linkn
+          if (cdrop[2]==UP) { # start particle at upstream end
+            dist <- 0 # distance along the link =0
+          }
+          else { # particle is at the downstream end
+            dist <- link.xy(linkn,0)['len'] # at downstream end
+               } # end else
+          # route the particle along the link
+          nc <- link.route(linkn, dist) # returns next cell number as nc
+          } # end else
+     if (nc==0) { # simulation time surpassed
+       print('Particle did not exit within the time of the simulation')
+       break} 
+    } # end for i
+} # end while loop over starting cell
