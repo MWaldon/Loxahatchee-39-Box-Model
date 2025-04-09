@@ -40,7 +40,8 @@
        xlab = 'Date', ylab = 'Interior velocity cell 36-37 (m/day)')
   
 # map minimum depth 
-  sf.read()
+  # read Refuge shape files
+  sf.read() # code is in 39BoxFunctions.R 
   
   minMarshDepth <-  colMins(sim.Depth)[(ncanal+1):ncell]
   meanMarshDepth <- colMeans(sim.Depth)[(ncanal+1):ncell]
