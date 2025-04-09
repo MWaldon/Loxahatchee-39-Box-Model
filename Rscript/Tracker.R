@@ -38,7 +38,7 @@ source("39BoxFunctions.R")
 # load the general model constants 
 source("39BoxBase.R")
 # read Refuge shape files
-sf.read() # code is in in 39BoxFunctions.R
+sf.read(Quiet = TRUE) # code is in in 39BoxFunctions.R
 
 # set constants
 startcolor <- 'red'
@@ -244,6 +244,9 @@ while(TRUE) { # until user ends the run
           } # end else
      if (nc==0) { # simulation time surpassed
        print('Particle did not exit within the time of the simulation')
+       print(paste('in link ', linkn, ' on ', Day2Date(time.sim+1)))
        break} 
+      # print(Day2Date(time.sim+1))
     } # end for i
-} # end while loop over starting cell
+  # print(paste('Outflow from cell', nc, ' on ', Day2Date(time.sim+1)))
+  } # end while loop over starting cell
