@@ -20,7 +20,25 @@
 
 # cell.xy returns xy for cell ( already defined)
 
-library(plotrix)
+# remove all variables from the environment except "filename"
+rm(list = ls()[! ls() %in% "filename"])
+
+
+
+# currently Tracker will only run properly on a dataset 
+# with data beginning on 1/1/95
+# load saved dataset
+load(file="../Datasets/39-Box-Datasets.Rdata")
+# load base model output
+load(file="../Output/39BoxBase.Rdata")
+
+
+# functions 
+source("39BoxFunctions.R")  
+# load the general model constants 
+source("39BoxBase.R")
+# read Refuge shape files
+sf.read() # code is in in 39BoxFunctions.R
 
 # set constants
 startcolor <- 'red'

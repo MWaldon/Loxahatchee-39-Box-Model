@@ -41,8 +41,13 @@
   # 
   
 #
-# libraries used in functions
+# load libraries used in functions and elsewhere
 library(readxl)   # read Excel worksheets
+library(sf)       # shape files
+library(plotrix)  # plotting functions
+library(matrixStats) # needed for colMin
+
+
 #---------------------------DEPTH-----------------------------------------------
 Cell.Depth.calc <- function(v) { # returns depth(m) as a vector 1..ncell
   # uses cell and CanalVS datasets

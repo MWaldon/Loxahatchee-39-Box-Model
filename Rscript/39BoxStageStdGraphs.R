@@ -1,7 +1,5 @@
 # plot the standard stage graphs following a model run
 
-library(readxl)      # read Excel worksheets
-library(matrixStats) # needed for colMin
 
 # source('39BoxFunctions.R') # these are likely already loaded
 

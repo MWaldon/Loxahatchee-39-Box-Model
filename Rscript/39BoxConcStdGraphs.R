@@ -3,8 +3,7 @@
 # UNDER CONSTRUCTION
 stop("concentration graphics script is not written yet")
 
-library(readxl)      # read Excel worksheets
-library(matrixStats) # needed for colMin
+
 
 # source('39BoxFunctions.R') # these are likely already loaded
 
