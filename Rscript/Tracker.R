@@ -43,7 +43,9 @@ sf.read(Quiet = TRUE) # code is in in 39BoxFunctions.R
 # set constants
 startcolor <- 'red'
 trackcolor <- 'black'
-cellcolor <- 'green'
+cellcolor  <- 'green'
+linecolor <- 'darkred'
+outcolor   <- 'blue'
 UP <- 1  # upstream end
 DN <- 0  # downstream end
 OT <- -1 # structure outflow
@@ -226,7 +228,8 @@ while(TRUE) { # until user ends the run
       if (linkn==-1) { # outflow
         print(paste('outflow of particle from cell ', nc, ' on date = ',
                     Day2Date(time.sim+1)))
-        lines(track$x, track$y, col=startcolor)
+        lines(track$x, track$y, col=linecolor)
+        points(xy['x'], xy['y'], col=outcolor, cex=2, pch = 8) # Display final
         break
         } # end if
       if (linkn==0) {# no outflow
