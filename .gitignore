@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# ignore Excel temporary files
+**/~*
