@@ -1,20 +1,22 @@
 # This script reads data and creates data frames. Data frames are saved 
 # to the files 39-Box-Datasets 39-Box-MassDatasets.
 
+# Model data are associated with one of 3 groups
+   #    1. Cells, 2. Links, or 3. Structures
+
+library(readxl) # used to read data from Excel files
+
 # ____________________________________________________________
 # remove all variables from the environment
   rm(list = ls())
-  library(readxl)
 # ____________________________________________________________
 # set constants
-  # Model data are associated with one of 3 groups
-#    Cells, Links, or Structures
-# Geometry of cells and links
+  # Geometry of cells and links
   ncell  = 39 # total number of cells,
   ncanal = 11 # number of canal cells
   nlink  = 52 # number of links for link-node model
   nstruct <- 19 # number of inflow/outflow structures
-
+  # date and time constants
   R.BaseDate <- as.Date(0)   # day zero for R dates is 01Jan1970
   Model.BaseDate <- as.Date('1995-01-01') # earliest date for model, day=1
   Model.EndDate <-  as.Date('2009-06-30') # last possible date for model

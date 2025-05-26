@@ -38,6 +38,10 @@
   # sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
   # cell.xy <- function(i) { # return the cell xy centroid for cell i
   # links.plot <- function() { # plot links
+  # point_in_cell <- function(shapefile) { # return point inside each cell
+  #
+  # find_polygon_line_intersection <- function(polygon, line_start, line_end)
+  #   -- in file polygon_line_intersection.R
   # 
   
 #
@@ -474,7 +478,8 @@ marsh.map <- function(x, maptitle="") { # plot x as a marsh choropleth map
 sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
   library(sf) # library containing _sf functions
   # function read_sf now preferred over st_read
-  # canal_sf, marsh_sf, marsh_boundary_sf, Id2icell
+  # this function sets the following global variables (uses <<-) 
+  #    canal_sf, marsh_sf, marsh_boundary_sf, Id2icell, cell.plotxy
   canal_sf          <<- read_sf("../Maps/New_canal_cells.shp", quiet = Quiet)
   marsh_sf          <<- read_sf("../Maps/New_marsh_cells.shp", quiet = Quiet)
   marsh_boundary_sf <<- read_sf("../Maps/New_marsh_boundary.shp", quiet = Quiet)
@@ -493,25 +498,40 @@ sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
   canal_sf$icell <<- Id2icell[1:ncanal,]$icell
   marsh_sf$icell <<- Id2icell[(ncanal+1):ncell,]$icell
   
+  # set cell plotting xy as a point inside the cell
+  #   (note that the cell centroid the centroid is not guaranteed 
+  #    to be inside the polygon, especially for concave  canal polygons)
+  cell.plotxy <<- matrix(data = NA, nrow = ncell, ncol = 2)
+  cell.plotxy[1:ncanal,]         <<- point_in_cell(canal_sf)
+  cell.plotxy[(ncanal+1):ncell,] <<- point_in_cell(marsh_sf)
+  
   # all values are returned as globals
+  return(TRUE)
 } # end sf.read
 
 
-cell.xy <- function(i) { # return the cell xy centroid for cell i
+cell.xy <- function(i, centroid = TRUE) { # return cell xy 
+  # default xy is centroid for cell i
+  # if centroid==FALSE then return xy plotting point
   # i is a single value, not a vector
-  # globals: ncanal, Id2icell, marsh_sf
-  if (i>ncanal) { # marsh cell
-    Id <- Id2icell[Id2icell$icell==i,]$Id
-    x <- marsh_sf$cen_X[Id] # 'cen' was used in marsh_sf
-    y <- marsh_sf$cen_Y[Id]
-  }
-  else {
-    x <- canal_sf$Cen_X[i] # note: Cen not cen was used in canal_sf
-    y <- canal_sf$Cen_Y[i] 
-  } # end if else
-  xy <- c(x,y)
+  # globals: ncanal, Id2icell, canal_sf, marsh_sf, cell.plotxy
+  if (centroid) { # default, return centroid 
+    if (i>ncanal) { # marsh cell
+      Id <- Id2icell[Id2icell$icell==i,]$Id # map cell number to cell Id
+      x <- marsh_sf$cen_X[Id] # 'cen' was used in marsh_sf
+      y <- marsh_sf$cen_Y[Id]
+    }
+    else { # canal cell
+      x <- canal_sf$Cen_X[i] # note: Cen not cen was used in canal_sf
+      y <- canal_sf$Cen_Y[i] 
+    } # end if else canal/marsh
+    xy <- c(x,y) # centroid coordinate pair
+  } # end if 
+  else { # centroid==FALSE
+    xy <- cell.plotxy[i,] # plotting point coordinate pair
+    }
   names(xy) <- c('x','y')
-  return(xy)
+  return(xy) # return cell x y coordinates
 } # end cell.xy
 
 links.plot <- function() { # plot links
@@ -535,6 +555,21 @@ links.plot <- function() { # plot links
   } # end for 
 } # end links.plot
 
+point_in_cell <- function(shapefile) { # return point inside each cell
+  # returns xy coordinates of a characteristic point in the cell polygons
+  # uses sf library function st_point_on_surface
+  #  This algorithm involves finding a horizontal scan line intersecting 
+  #  the polygon and then picking a point on the widest interior segment 
+  #  of that line.
+  
+  n <- dim(shapefile)[1] # number of cells in shapefile
+  p <- matrix(data=NA, nrow=n, ncol=2) # matrix of point coordinates
+  pos <- st_point_on_surface(shapefile)$geometry # list of n points
+  for (i in 1:n) {
+    p[i,] <- pos[[i]] # put point coordinates into the result matrix
+  }
+  return(p)
+} # end point_in_cell
 
 
 #__________________end of script 39BoxFunctions.R#______________________________
