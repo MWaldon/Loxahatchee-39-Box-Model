@@ -34,8 +34,16 @@
   # Stage.hist <- function(gauges, cellnum) { #hist of stage at USGS gague sites
   # marsh.map <- function(x, maptitle="") { # plot x as a marsh choropleth map
 
-  # SHAPE FILES
+  # MAPPING & SHAPE FILES
   # sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
+  # dist.p2p <- function(x1, x2) { # distance from point to point
+  # dist.p2l <- function(x0, x1, x2) { # distance from point to line
+  # dist.p2ls <- function(x0, x1, x2) { # distance from point to a line segment
+  # dist.p2pg <- function(x0, pg) { # distance from point to polygon boundary
+  # find.bordering <- function(x0, verts, tolerance=50) { # find cells with x0 on the border
+  # bordering.list <- function(verts, tolerance=50) { # return a list of bordering cell numbers
+  # bordering.n <- function(b_list) { # return vector of length of each item in list
+  # verticies.list <- function(sfun) { # return the vertices in shape function
   # cell.xy <- function(i) { # return the cell xy centroid for cell i
   # links.plot <- function() { # plot links
   # point_in_cell <- function(shapefile) { # return point inside each cell
@@ -472,7 +480,7 @@ marsh.map <- function(x, maptitle="") { # plot x as a marsh choropleth map
   plot(marsh_sf_temp["x"], main = maptitle) # see help plot_sf
 } # end marsh.map
 
-#__________________Shape Files__________________________________________________
+#__________________Mapping & Shape Files________________________________________
 # read and plot shape files
 
 sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
@@ -502,12 +510,161 @@ sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
   #   (note that the cell centroid the centroid is not guaranteed 
   #    to be inside the polygon, especially for concave  canal polygons)
   cell.plotxy <<- matrix(data = NA, nrow = ncell, ncol = 2)
-  cell.plotxy[1:ncanal,]         <<- point_in_cell(canal_sf)
-  cell.plotxy[(ncanal+1):ncell,] <<- point_in_cell(marsh_sf)
+  # Id2icell maps the polygon Id number to cell number
+  cell.plotxy[Id2icell$icell[1:ncanal], ]         <<- point_in_cell(canal_sf)
+  cell.plotxy[Id2icell$icell[(ncanal+1):ncell], ] <<- point_in_cell(marsh_sf)
   
   # all values are returned as globals
   return(TRUE)
 } # end sf.read
+
+dist.p2p <- function(x1, x2) { # distance from point to point
+  # x1 and x2 are vectors with (x, y) coordinates
+  dx2 <- (x1[1]-x2[1])^2
+  dy2 <- (x1[2]-x2[2])^2
+  d <- sqrt(dx2+dy2)
+  return(d)
+} # end dist.p2p
+
+dist.p2l <- function(x0, x1, x2) { # distance from point to line
+  # x0 x1 and x2 are vectors with (x, y) coordinates
+  # x0 is point, x1 and x2 define the line
+  # see Wikipedia article "Distance from a point to a line"
+  d12 <- dist.p2p(x1,x2) # distance between x1 and x2
+  if (d12==0) { # x1 and x2 are the same point
+    d <- dist.p2p(x0,x1)
+  }
+  else { # x1 != x2
+    x <- 1
+    y <- 2
+    dx <- x2[x]-x1[x]
+    dy <- x2[y]-x1[y]
+    # a2 is twice the area of the triangle with its vertices at the three points
+    a2 <- abs((dy*x0[x]) - (dx*x0[y]) + (x2[x]*x1[y]) - (x2[y]*x1[x]))
+    d <- a2/d12 # height of triangle is twice the area divided by the base
+  }
+  return(d)
+}
+
+dist.p2ls <- function(x0, x1, x2) { # distance from point to a line segment
+  # x0 x1 and x2 are vectors with (x, y) coordinates
+  # x0 is point, x1 and x2 define the line segmant ends
+  d01 <- dist.p2p(x0,x1)     # distance x0 to x1
+  d02 <- dist.p2p(x0,x2)     # distance x0 to x2
+  d12 <- dist.p2p(x1,x2)     # distance x1 to x2
+  d0 <- dist.p2l(x0, x1, x2) # shortest distance x0 to line through x1,x2
+  dh <- sqrt(d12^2 + d0^2)   # hypotenuse when x0, x1, x2 is a right triangle
+  perim90 <- d0+d12+dh       # perimeter x0, x1, x2 when its a right triangle
+  perim <- d01+d12+d02       # actual perimeter x0, x1, x2
+  # projection is outside of line segment then perimeter is larger than perim90
+  if(perim>perim90) { 
+    # use shortest distance to an end point
+    d <- min(d01,d02)
+  }
+  else { # projection is on the line segment
+    # use shortest distance to line
+    d <- d0 
+  }
+  return(d)
+}
+
+dist.p2pg <- function(x0, pg) { # distance from point to polygon boundary
+  # x0 is a vector with (x, y) coordinates
+  # pg is a matrix of coordinates of polygon vertices (x,y)
+  n <- dim(pg)[1] # number of vertices
+  if (n==1) { # pg is a single point
+    d <- dist.p2p(x0, pg)
+    return(d) # return point to point distance and exit function
+  }
+  if (!all(pg[1,]==pg[n,])) { # close the polygon is not closed
+    n <- n+1
+    pg <- rbind(pg, pg[1,])
+  } # end if
+  d <- 1E10 # initialize to a big number
+  for (i in 1:(n-1)) { # loop through polygon line segments
+    dtest <- dist.p2ls(x0,pg[i,], pg[i+1,])
+    d <- min(d, dtest)
+  } # end for
+  return(d)
+} # end function dist.p2pg
+
+find.bordering <- function(x0, verts, tolerance=50) { # find cells with x0 on the border
+  # x0 has x,y coordinates of test location
+  # verts is a dataframe of polygon vertices (created in Marsh.Map.contour.R)
+  # tolerance is distance in meters considered to be on the border
+  # returns vector of cell numbers where x0 is on the border of the cell
+  # globals: verts, ncanal, ncell
+  nm <- ncell-ncanal # number of marsh cells
+  nvert <- dim(verts$x) # number of vertices
+  bordercells <- c() # initialize vector of border cell numbers
+  nborder <- 0       # initialize number of bordering cells
+  for (i in 1:nm) { # loop through all marsh cell Id values
+    pgdf <- verts[verts$Id==i,] # polygon i dataframe
+    pg   <- cbind(pgdf$x, pgdf$y) # polygon coordinate matrix
+    d <- dist.p2pg(x0,pg)
+    if (abs(d)<tolerance) { # if x0 is on the border of pg
+      nborder <- nborder+1 
+      # append the newly found cell number
+      bordercells <- c(bordercells, Id2icell[ncanal+i,2]) 
+    } # end if
+  } # end for
+  return(bordercells)
+} # end find.bordering
+
+bordering.list <- function(verts, tolerance=50) { # return a list of bordering cell numbers
+  # verts is a dataframe of polygon vertices (created in Marsh.Map.contour.R)
+  n <- dim(verts)[1] # number of vertices
+  b_list <- vector("list", n) # create list with n items
+  for (i in 1:n) { # fill in the list
+    b_list[[i]] <- find.bordering(c(verts$x[i],verts$y[i]), verts, tolerance)
+    # points(verts$x[i],verts$y[i], 
+    #        col=length(my_list[[i]]), cex=length(my_list[[i]]))
+  } # end for i
+  return(b_list)
+} # end bordering.list
+
+bordering.n <- function(b_list) { # return vector of length of each item in list
+  # b_list is a list of vectors
+  nv <- length(b_list) # number of items in the list
+  x <- rep(NA,nv)      # initialize vector x
+  for (i in 1:nv) x[i] <- length(b_list[[i]]) # length of each item
+  return(x)
+} # end function bordering.n
+
+verticies.list <- function(sfun) { # return the vertices in shape function
+  # return all polygon vertices in a dataframe
+  # library(dplyr)      # For sorting function arrange (no longer used)
+  
+  mgeo <- sfun$geometry # marsh cell geometry
+  vertices <- NULL # initialize list of vertices
+  for (i in 1:(ncell-ncanal)) { # append vertices from each polygon to vertices
+    vert <- mgeo[[i]]        # extract the ith polygon
+    vert <- as.matrix(vert)
+    nv <- dim(vert)[1] # number of vertices in vert
+    ic <- sfun$icell[i]
+    vert <- cbind(i, ic,1:nv, vert)    # add a cell Id and icell column equal to i
+    vertices <- rbind(vertices,vert) # append to rows of vertices
+  }
+  vertices <- data.frame(vertices)   # convert to dataframe
+  names(vertices) <- c('Id','icell','n','x','y')
+  ic <- sfun$icell
+  vertices$icell <- ic[vertices$Id]    # add marsh cell number column
+  # add bordering cells information
+  b_list <- bordering.list(vertices, # list of vectors of border cell numbers
+                           tolerance = 50) # bordering if within tolerance (m)
+  b_n    <- bordering.n(b_list) # number of border cells
+  vertices$b_n    <- b_n 
+  vertices$b_list <- b_list
+  return(vertices)
+  
+} # end vertices.list
+# plot vertices to test function
+# vertices <- verticies.list(marsh_sf)
+# plot(vertices$x,vertices$y)
+# for (i in 1:(ncell-ncanal)) {
+#   vert <- vertices$Id==i
+#   lines(vertices$x[vert],vertices$y[vert], col='yellow')
+# } # end for i
 
 
 cell.xy <- function(i, centroid = TRUE) { # return cell xy 
@@ -516,18 +673,19 @@ cell.xy <- function(i, centroid = TRUE) { # return cell xy
   # i is a single value, not a vector
   # globals: ncanal, Id2icell, canal_sf, marsh_sf, cell.plotxy
   if (centroid) { # default, return centroid 
+    Id <- Id2icell[Id2icell$icell==i,]$Id # map cell number to cell Id
     if (i>ncanal) { # marsh cell
-      Id <- Id2icell[Id2icell$icell==i,]$Id # map cell number to cell Id
       x <- marsh_sf$cen_X[Id] # 'cen' was used in marsh_sf
       y <- marsh_sf$cen_Y[Id]
     }
     else { # canal cell
-      x <- canal_sf$Cen_X[i] # note: Cen not cen was used in canal_sf
-      y <- canal_sf$Cen_Y[i] 
+      x <- canal_sf$Cen_X[Id] # note: Cen not cen was used in canal_sf
+      y <- canal_sf$Cen_Y[Id] 
     } # end if else canal/marsh
     xy <- c(x,y) # centroid coordinate pair
   } # end if 
   else { # centroid==FALSE
+    # cell.plotxy is calculated in function sf.read
     xy <- cell.plotxy[i,] # plotting point coordinate pair
     }
   names(xy) <- c('x','y')
