@@ -43,7 +43,7 @@
   # find.bordering <- function(x0, verts, tolerance=50) { # find cells with x0 on the border
   # bordering.list <- function(verts, tolerance=50) { # return a list of bordering cell numbers
   # bordering.n <- function(b_list) { # return vector of length of each item in list
-  # verticies.list <- function(sfun) { # return the vertices in shape function
+  # vertices.list <- function(sfun) { # return the vertices in shape function
   # cell.xy <- function(i) { # return the cell xy centroid for cell i
   # links.plot <- function() { # plot links
   # point_in_cell <- function(shapefile) { # return point inside each cell
@@ -514,6 +514,7 @@ sf.read <- function(Quiet=FALSE) { # reads canal, marsh, & boundary shape files
   cell.plotxy[Id2icell$icell[1:ncanal], ]         <<- point_in_cell(canal_sf)
   cell.plotxy[Id2icell$icell[(ncanal+1):ncell], ] <<- point_in_cell(marsh_sf)
   
+  vertices <<- vertices.list(marsh_sf) # get all marsh polygon vertices
   # all values are returned as globals
   return(TRUE)
 } # end sf.read
@@ -631,7 +632,7 @@ bordering.n <- function(b_list) { # return vector of length of each item in list
   return(x)
 } # end function bordering.n
 
-verticies.list <- function(sfun) { # return the vertices in shape function
+vertices.list <- function(sfun) { # return the vertices in shape function
   # return all polygon vertices in a dataframe
   # library(dplyr)      # For sorting function arrange (no longer used)
   
@@ -659,7 +660,7 @@ verticies.list <- function(sfun) { # return the vertices in shape function
   
 } # end vertices.list
 # plot vertices to test function
-# vertices <- verticies.list(marsh_sf)
+# vertices <- vertices.list(marsh_sf)
 # plot(vertices$x,vertices$y)
 # for (i in 1:(ncell-ncanal)) {
 #   vert <- vertices$Id==i
