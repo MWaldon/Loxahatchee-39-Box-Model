@@ -1,27 +1,28 @@
 ls.add <- function(xyz, lmax) { # add points along a line segment
   # xyz is a 2x3 matrix of beginning and ending coordinates
-  # lmax is a maximum final distance for any ls point from a xy point
-  d <- dist.p2p(xyz[1:2,1], xyz[1:2,2]) # total length of line segment
+  # lmax is a maximum final distance for any ls point from an xy point
+  d <- dist.p2p(xyz[1,1:2], xyz[2,1:2]) # total length of line segment
   nadd <- trunc(d/(2*lmax)) -1 # number of points to add
   ntot <- nadd+2 # final number of points including end points
   xyz.new <- matrix(nrow = ntot, ncol = 3) # define the result matrix
   xyz.new[1,] <- xyz[1,]
   xyz.new[ntot,] <- xyz[2,]
-  dxyz <- (xyz[2,]-xyz[1,])/(nadd+1) # linear increments
-  if (nadd>0) {
+  dxyz <- (xyz[2,]-xyz[1,])/(nadd+1) # linear increments vector dx, dy, dz
+  if (nadd>0) { # if there are any point to add
     for (i in 1:(nadd)) { # loop through new points
       xyz.new[(i+1),] <- xyz[1,] + (i*dxyz)
     } # end for i
   } # end if
-  return(xyz.new)
+  return(data.frame(x=xyz.new[,1], y=xyz.new[,2], z=xyz.new[,3]))
 } # end function ls.add
 
 vertices.add <- function(lmax) { # add vertices to long segments
   # lmax is a maximum length
   # global vertices
   # returns verts.new, dataframe with added vertices
+  # vertices is geometry data for marsh cells
   verts <- vertices # verts is a dataframe of polygon information
-  np <- max((verts$Id)) # number of polygons
+  np <- max((verts$Id)) # number of marsh polygons
   verts.new <- verts[FALSE,] # create empty dataframe with verts structure
   
   if (FALSE) { # ------------------------------------------------------
@@ -76,14 +77,47 @@ vertices.add <- function(lmax) { # add vertices to long segments
   
 } # end function vertices.add
 
+z_points.add <- function(lmax, z_points, z) { # add vertices to long segments
+  # lmax is a maximum length
+  # z_points is dataframe of xyz for cell plotting ordered by marsh cell$Id
+  # z is vector length ncell of values for each polygon by cell number icell
+  # global vertices (all marsh polygon vertices)
+  # returns z_points.new, z_points dataframe with added xyz
+  z_points.new <- z_points # create new dataframe for expanded xyz points
+  np <- dim(vertices)[1] # number of rows, or number of marsh polygon vertices
+  vz <- rep(NA,np) # z value for all vertices
+  for (i in 1:np) { # loop through all the vertices
+    # calculate vz, the vertex z value for the ith vertex
+    #   vz is the mean of z for each bordering polygon
+    cn <- vertices[i,]$b_list[[1]] # vector of cell numbers of bordering cells
+    cz <- z[cn] # vector of z values for bordering cells
+    vz[i] <- mean(cz) # z mean of border cells
+    # the polygons are closed, loop through all line segments 
+    if (vertices[i,]$n!=1){ # skip first vertex in each polygon
+      # define endpoints and z of the current line segment
+      xyz <- matrix(byrow = TRUE, nrow = 2, ncol = 3, data = 
+                      c(vertices[i-1,]$x, vertices[i-1,]$y, vz[i-1],
+                        vertices[i,  ]$x, vertices[i,  ]$y, vz[i]  ))
+      # add points for this line segment to new points dataframe
+      z_points.new <- rbind(z_points.new, ls.add(xyz, lmax))
+    } # end if not first vertex in polygon
+  } # end for i
+  # z_points.new <- unique(z_points.new) # keep unique xyz points
+  return(z_points.new) # return the extended list
+} #end function z_points.add
+  
+
+
 
 
 MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
                              raster.length = 500,
-                             idp =           2.0,
+                             idp =           1.0,
                              zlimit =        NULL,
                              UseCentroid =   FALSE,
-                             boundary.add =  TRUE) 
+                             boundary.add =  TRUE,
+                             plot.do =       TRUE,
+                             plot.return =   FALSE) 
 { # contour plotting function
   # Plot contours of z over the marsh map, returns a plot object
   # z is vector length ncell of values for each polygon by cell number icell
@@ -93,24 +127,27 @@ MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
   # raster.length is the distance between raster points
   # zlimit is a vector with min max z plotting values, example zlimit = c(0,1.5)
   # idp is the inverse distance weighting power (smaller gives smoother, distant
-  # objects have geater weight)
+  #   objects have geater weight)
   # UseCentroid = TRUE then use the cell centroid rather than plotting point
+  # boundary.add = TRUE then add boundary vertices z values for interpolation
+  # plot.do = TRUE then do draw the plot
+  # plot.return = TRUE then return the plot object in the return list
   # global marsh_sf, ncell, ncanal
   #   (note: programming this function was initially assisted by Perplexity.ai)
   
-  # Load required libraries
+# Load required libraries
   library(sf)         # For handling shapefiles
   library(raster)     # For raster operations
   library(gstat)      # For spatial interpolation
   library(dplyr)      # For sorting function arrange
   
-  # Prepare data
+# Prepare data
   m_sf <- marsh_sf # copy of marsh shape file
   nm <- ncell-ncanal # number of marsh cells
   m_sf$z <- rep(NA,nm) # initialize attribute z for plotting
   m.geom <- m_sf$geometry
   
-  # Find polygon xy and their elevations
+# Find polygon xy and their elevations
   coords <- matrix(nrow = nm, ncol = 2) # initialize matrix of polygon xy values
   for (i in (ncanal+1):ncell) { # set xy of points for each marsh polygon
     j <- m_sf$Id[m_sf$icell==i] # Id value
@@ -128,46 +165,17 @@ MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
   # create value dataframe
   zs <- m_sf$z # zs is z values rearranged to correspond to m_sf$Id
   
-  # Create a dataframes for interpolation
+  # Create a dataframe containing xyz data for interpolation
   z_points <- data.frame(x = coords[,1], y = coords[,2], z = zs)
-  
+
+# optionally, add boundary xyz points to z_points
   if (boundary.add) { # add points along polyfon boundaries
     # add coordinates and values at polygon vertices
-    verts <- vertices # marsh polygon vertices (vertices is saved by sf.read()
-    
-    # polygons are closed so first and last vertex are the same point
-    verts <- vertices.add(raster.length) # add vertices to long segments
-    verts <- verts[verts$n != 1,]  # drop the redundant first polygon point n==1 
-    # make a matrix of the unique coordinate pairs plus z data
-    xyz <- cbind(verts$x,verts$y) # x & y coordinates 
-    nxyz <- dim(xyz)[1] # number of points
-    xyz <- cbind(xyz, rep(c(), nxyz)) # add z coordinate, initialize to NA
-    for (i in 1:nxyz) {
-      nc <- verts$b_n[i] # number of cells bordering xy[i]
-      zb <- rep(NA, nc) # initialize vector of cell z values bordering xy[i]
-      for (j in 1:nc) {
-        ic <- verts$b_list[[i]][j]
-        zb[j] <- z[ic] # z for jth cell bordering ith vertex
-      } # end for j
-      xyz[i,3] <- mean(zb)
-    } # end for i
-    verts$z <- xyz[,3] # save the z value in verts
-    # 
-    xyz <- unique(xyz)
-    minxy <- 20
-    nxyz <- dim(xyz)[1]
-    verti <- list()
-    for (i in 1:nxyz) { # set z = mean of all instances
-      verti[i] <- verts[abs(verts$x-xyz[i,1])<minxy & abs(verts$y==xyz[i,2])<minxy, ]
-      #verti <- mean(m_sf$z[m_sf$icell])
-    }
-    # add the boundary points to the z_points dataframe
-    xyz <- data.frame(xyz) # convert to dataframe
-    names(xyz) <- names(z_points) # names must be identical for rbind
-    z_points <- rbind(z_points, xyz) # add boundary xyz values 
+    z_points <- z_points.add(raster.length, z_points, z) # add boundary points
     zs <- z_points$z # update zs with added values
   } # end if boundary.add
-  
+
+# create the plotting objects  
   # Create a Raster Grid
   # Define the extent and resolution
   region_bbox <- st_bbox(m_sf) # bounding box 
@@ -197,13 +205,21 @@ MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
   # mask z_raster
   z_raster <- mask(z_raster, m_sf_sp)
   
-  # Draw contour map
+# Draw contour map
+  if(plot.do) {
   # plot the raster map, then the cells, then the contours
   plot(z_raster, main = paste(cplot.title, cplot.date), zlim = zlimit)
   plot(m_sf_sp, add = TRUE, border = "yellow")
   contour(z_raster, add = TRUE)
+  } # end if plot.do
   
   # save the plot as object cplot
-  cplot <- recordPlot()
-  return(list(cplot, z_points)) # plot completed 
+  # note: use coordinates function to get xyz values from the returned
+  #   SpatialPointsDataFrame object z_points
+  if(plot.return) { # return the points data and plot object
+    cplot <- recordPlot()
+    return(xyz=list(z_points, cmap=cplot)) 
+  } else { # return only the points data
+    return(list(xyz=z_points)) 
+  }
 } # end MarshMap.contour
