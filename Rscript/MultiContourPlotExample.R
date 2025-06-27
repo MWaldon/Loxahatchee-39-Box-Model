@@ -1,5 +1,10 @@
 # These functions make and display a contour plots series
 
+# example use: weekly depth (cm) in 1999 
+# cplots <- cplots.make(z.plot = sim.Depth*100, dstart = as.Date('1999-01-01'), dend =   as.Date('1999-12-31'), dstep = 7, zmin = 0, zmax = 200, raster.len = 500, cplots.title = 'Marsh Depth (cm)')
+# cplots.show(cplots, loops = 2)
+# object.size(cplots) for this example is total 19,461,744 bytes (53 plots)
+
 cplots.make <- function(   # create and display a series of plots
 # example of using the MarshMap.contour function
   z.plot = sim.Depth, # property to contour plot on the z axis
