@@ -1,3 +1,32 @@
+MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
+                             raster.length = 500,
+                             idp =           1.0,
+                             zlimit =        NULL,
+                             UseCentroid =   FALSE,
+                             boundary.add =  TRUE,
+                             plot.do =       TRUE,
+                             plot.return =   FALSE) 
+{ # contour plotting function
+  # Plot contours of z over the marsh map, 
+  # returns a list containing:
+  #   spatial points dataframe with all points used to generate the plot
+  #   optionally list contains the plot object if plot.return = TRUE
+  # z is vector length ncell of values for each polygon by cell number icell
+  #   for example, z = stage, depth, soil elevation, ..., in all cells by cell #
+  # cplot.date is date for title as either a date object or text
+  # cplot.title is text for plot title
+  # raster.length is the distance between raster points
+  # zlimit is a vector with min max z plotting values, example zlimit = c(0,1.5)
+  # idp is the inverse distance weighting power (smaller gives smoother, distant
+  #   objects have geater weight)
+  # UseCentroid = TRUE then use the cell centroid rather than plotting point
+  # boundary.add = TRUE then add boundary vertices z values for interpolation
+  # plot.do = TRUE then do draw the plot
+  # plot.return = TRUE then return the plot object in the return list
+  # global marsh_sf, ncell, ncanal
+  #   (note: programming this function was initially assisted by Perplexity.ai)
+
+# -------------------------- FUNCTIONS -----------------------------------  
 ls.add <- function(xyz, lmax) { # add points along a line segment
   # xyz is a 2x3 matrix of beginning and ending coordinates
   # lmax is a maximum final distance for any ls point from an xy point
@@ -16,73 +45,13 @@ ls.add <- function(xyz, lmax) { # add points along a line segment
   return(data.frame(x=xyz.new[,1], y=xyz.new[,2], z=xyz.new[,3]))
 } # end function ls.add
 
-vertices.add <- function(lmax) { # add vertices to long segments
-  # lmax is a maximum length
-  # global vertices
-  # returns verts.new, dataframe with added vertices
-  # vertices is geometry data for marsh cells
-  verts <- vertices # verts is a dataframe of polygon information
-  np <- max((verts$Id)) # number of marsh polygons
-  verts.new <- verts[FALSE,] # create empty dataframe with verts structure
-  
-  if (FALSE) { # ------------------------------------------------------
-    for (i in 1:np) { # loop through all of the polygons
-      pg <- verts[verts$Id==i,] # the ith polygon
-      # number of line segments is one less than munber of vertices
-      ls <- length(pg$Id)-1  
-      for (j in 1:ls) { # loop through line segments in pg
-        lstart <- pg[pg$n==j,]     # first vertex of segment
-        lend   <- pg[pg$n==(j+1),] # last vertex of segment
-        xyz <- matrix(nrow=2, ncol=3) # coordinates of strart and end of segment
-        xyz[1,] <- c(lstart$x, lstart$y, lstart$z) # coordinates of start of segment
-        xyz[2,] <- c(  lend$x,   lend$y,   lend$z) # coordinates of end of segment
-        xyz.new <- ls.add(xyz, lmax)
-        n.new <- length(xyz.new$x)
-        for (k in 1:(n.new)) {
-          pnext <- pg[1,]
-          pnext$x <- xyz[k,1]
-          pnext$y <- xyz[k,2]
-          pnext$z <- xyz[k,3]
-          verts.new <- rbind(verts.new, pnext)
-        }
-        verts.new <- rbind(verts.)
-        
-        
-        
-        
-        verts.new <- rbind(verts.new, pg[pg$n==j,]) # first vertex of segment
-        verts.new <- rbind(verts.new, pg[pg$n==(j+1),]) # last vertex of segment
-        
-        next <- pg[pg$n==(j+1),] # end of line segment
-        xy2 <- c(next$x, next$y) # coordinates of end of segment
-        d <- lmax # initialize d for loop
-        while (d>=lmax) { # loop until d<lmax
-          d <- dist.p2p(xy1,xy2)   # length of segment
-          
-        }
-        
-        
-        
-        if (d<lmax) { # length if too long, add a point
-          # add another vertex on this line segment
-        }
-        
-        # until d<lmax
-        
-      } # end for j
-      
-    } # end for i
-  } # end if (FALSE) ------------------------------------------------------
-  
-  
-} # end function vertices.add
-
-z_points.add <- function(lmax, z_points, z) { # add vertices to long segments
+z_points.add <- function(lmax, z_points, z) { # add vertices to z_points
+  # also add more points along long line segments
   # lmax is a maximum length
   # z_points is dataframe of xyz for cell plotting ordered by marsh cell$Id
   # z is vector length ncell of values for each polygon by cell number icell
   # global vertices (all marsh polygon vertices)
-  # returns z_points.new, z_points dataframe with added xyz
+  # returns z_points.new, z_points dataframe with added xyz values
   z_points.new <- z_points # create new dataframe for expanded xyz points
   np <- dim(vertices)[1] # number of rows, or number of marsh polygon vertices
   vz <- rep(NA,np) # z value for all vertices
@@ -105,36 +74,8 @@ z_points.add <- function(lmax, z_points, z) { # add vertices to long segments
   # z_points.new <- unique(z_points.new) # keep unique xyz points
   return(z_points.new) # return the extended list
 } #end function z_points.add
-  
 
-
-
-
-MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
-                             raster.length = 500,
-                             idp =           1.0,
-                             zlimit =        NULL,
-                             UseCentroid =   FALSE,
-                             boundary.add =  TRUE,
-                             plot.do =       TRUE,
-                             plot.return =   FALSE) 
-{ # contour plotting function
-  # Plot contours of z over the marsh map, returns a plot object
-  # z is vector length ncell of values for each polygon by cell number icell
-  #   for example, z = stage, depth, soil elevation, ..., in all cells by cell #
-  # cplot.date is date for title as either a date object or text
-  # cplot.title is text for plot title
-  # raster.length is the distance between raster points
-  # zlimit is a vector with min max z plotting values, example zlimit = c(0,1.5)
-  # idp is the inverse distance weighting power (smaller gives smoother, distant
-  #   objects have geater weight)
-  # UseCentroid = TRUE then use the cell centroid rather than plotting point
-  # boundary.add = TRUE then add boundary vertices z values for interpolation
-  # plot.do = TRUE then do draw the plot
-  # plot.return = TRUE then return the plot object in the return list
-  # global marsh_sf, ncell, ncanal
-  #   (note: programming this function was initially assisted by Perplexity.ai)
-  
+# --------------------------------------------------------------
 # Load required libraries
   library(sf)         # For handling shapefiles
   library(raster)     # For raster operations
@@ -218,7 +159,7 @@ MarshMap.contour <- function(z, cplot.date = '', cplot.title ='',
   #   SpatialPointsDataFrame object z_points
   if(plot.return) { # return the points data and plot object
     cplot <- recordPlot()
-    return(xyz=list(z_points, cmap=cplot)) 
+    return(list(xyz=z_points, cmap=cplot)) 
   } else { # return only the points data
     return(list(xyz=z_points)) 
   }
