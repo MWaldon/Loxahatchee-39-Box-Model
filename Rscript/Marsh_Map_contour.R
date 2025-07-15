@@ -76,6 +76,8 @@ z_points.add <- function(lmax, z_points, z) { # add vertices to z_points
 } #end function z_points.add
 
 # --------------------------------------------------------------
+# Begin MarshMap.contour code
+
 # Load required libraries
   library(sf)         # For handling shapefiles
   library(raster)     # For raster operations
@@ -103,9 +105,8 @@ z_points.add <- function(lmax, z_points, z) { # add vertices to z_points
     m_sf$z[m_sf$icell==j] <- z[j] # put z into m_sf
   }
   
-  # create value dataframe
+# create value dataframe z_points for interpolation
   zs <- m_sf$z # zs is z values rearranged to correspond to m_sf$Id
-  
   # Create a dataframe containing xyz data for interpolation
   z_points <- data.frame(x = coords[,1], y = coords[,2], z = zs)
 
@@ -153,12 +154,12 @@ z_points.add <- function(lmax, z_points, z) { # add vertices to z_points
   plot(m_sf_sp, add = TRUE, border = "yellow")
   contour(z_raster, add = TRUE)
   } # end if plot.do
-  
-  # save the plot as object cplot
+
+# return a list of object(s)
   # note: use coordinates function to get xyz values from the returned
   #   SpatialPointsDataFrame object z_points
   if(plot.return) { # return the points data and plot object
-    cplot <- recordPlot()
+    cplot <- recordPlot() # save the plot as object cplot
     return(list(xyz=z_points, cmap=cplot)) 
   } else { # return only the points data
     return(list(xyz=z_points)) 
