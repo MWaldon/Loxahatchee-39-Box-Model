@@ -167,6 +167,16 @@ Day2TIME <- function(d)  # function converts day to time in days
   # at the beginning of day=d
   return(d-1)
 
+sim.i <- function(d) # return output matrix row subscript given a date
+  # argument d may be either type Date or character
+  # note that Dates[sim.i(d)] == d
+  # globals: Start.Date
+{
+  if (is.character(d)) d <- as.Date(d)
+  i <- 1 + d - Start.Date
+  return(as.numeric(i))
+}
+
 #__________________FLOW TIMESERIES______________________________________________
 # Timeseries 
 # timeseries can extend from Model.BaseDate to Model.EndDate
