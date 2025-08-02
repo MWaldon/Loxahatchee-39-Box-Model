@@ -49,14 +49,16 @@ Canal_Map <- function(z,  plot.date = '', plot.title ='',
   } # end for
   # set color breaks
   if (is.null(zlim)) b <- "pretty" # default style for breaks
-  else b <- seq(zlim[1], zlim[2], length.out = ncolor) 
+  else b <- seq(zlim[1], zlim[2], length.out = ncolor+1) 
   # create the plot
+  # *** breaks and palette options are not working properly and are commented out ***
   plot(c_sf3["z"],  # plot the geometry with values from z column
        border = NA, # do not plot the borders
-       breaks = b,  # vector of breaks or 'pretty'
+       # breaks = b,  # vector of breaks or 'pretty'
        axes = axes, # TRUE or FALSE, plot the axes?
        main = paste(plot.title, plot.date), # plot title
-       pal = pal,   # color palette function
+       # pal = pal,   # color palette function
        key.pos = 4) # color key on 1-bottom, 2-left, 3-top, 4-right, NULL-omit
+  return(TRUE)
 } # end canal.map
 
