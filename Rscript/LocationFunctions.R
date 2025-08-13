@@ -24,6 +24,8 @@
 # SegLength <-  function(X1, Y1, X2, Y2){  # returns distance from point 1 to point 2, ends of a line segment
 
 # SegTable.create <- function() { # import the boundary segment table
+# Refuge.xybound <- function(SegTable) { # return Refuge xy bounding box corners
+# is.in_polygon <- function(x, y, pol_x, pol_y) { # Return logical TRUE if X,Y is inside polygon
 
 # ---------------- Translated lat/long VBA Macros ----------------
 # This module contains functions to approximately convert 
@@ -315,13 +317,48 @@ is.in_polygon <- function(x, y, pol_x, pol_y) {
   return(result != 0) # return TRUE if the point is in or on the polygon
 }
 
+Cells_in <- function(x, y, dxy = 25, cell.list = NULL) { 
+  # returns a vector of cells containing the point x,y
+  # x and y are point coordinates
+  # dxy is resolution distance
+  # cell.list is a starting vector of cells
+  # globals: ncell, canal_sf, marsh_sf
+  c_in <- cell.list # initialize list
+  for (i in 1:ncell) { # i is the model cell number
+    ic <- Id2icell$Id[Id2icell$icell==i] # get the polygon Id from cell number
+    if (i>ncanal) { # marsh
+      g <- marsh_sf$geometry
+    } else { # canal
+      g <- canal_sf$geometry
+    }
+    xy <- st_coordinates(g[[ic]])
+    if (is.in_polygon(x, y, xy[,1], xy[,2]) ) { 
+      c_in <- c(c_in, i)
+      # following statements are for testing
+      # plot(xy[,1], xy[,2], main = paste('cell', i), type = 'b')
+      # points(x,y, cex = 2, col = 'red')
+      } # end if
+  } # end for
+  c_in <- unique(c_in) # keep only unique values
+  if (dxy != 0) { # run with modified coordinates if dxy is not zero
+      c_in <- Cells_in(x+dxy, y, dxy=0, cell.list = c_in)
+      c_in <- Cells_in(x-dxy, y, dxy=0, cell.list = c_in)
+      c_in <- Cells_in(x, y+dxy, dxy=0, cell.list = c_in)
+      c_in <- Cells_in(x, y-dxy, dxy=0, cell.list = c_in)
+    } # end if
+  return(c_in)  
+  } # end Cells_in
+
+# create the segment table inthe global environment
 SegTable <- SegTable.create() # create the table
 
 # View(SegTable)
 # plot(SegTable$x1, SegTable$y1)
 # lines(c(SegTable$x1,SegTable$x2[19]),c(SegTable$y1, SegTable$y2[19]), col='red')
 
-# -------------------------------------------
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
 # script to test the functions
 #
 if(FALSE) {
