@@ -7,25 +7,28 @@
 #   with vertices beginning at the G-300 (vertex 1, line segment 1) and 
 #   counting up clockwise through 19 vertices and line segments.
 #
-
-# XCalculate <- function (Lat, Lon) { # return x coordinate from lat/long
-# YCalculate <- function (Lat, Lon) { # return y coordinate from lat/long
-# LongCalculate <-  function (X, Y) { # return long from UTM xy
-# LatCalculate <- function (X, Y)   { # return lat from UTM xy
-
-# CanalMeters <- function (X, Y, SegTable) { # returns clockwise canal distance
-# CanalDistance <-  function (X, Y, SegTable) { # returns distance to canal
-# NearestSeg <-  function (X, Y, SegTable) { # returns closest segment to x,y
-# PointLineCalc <- function(PtX, PtY, X1, Y1, X2, Y2) { # returns list(xmin, ymin, PointLineDist)
-# PointSegDistance <-  function (PtX, PtY, X1, Y1, X2, Y2) { # returns distance from point to a line segment
-# PointLineDistance <-  function (PtX, PtY, X1, Y1, X2, Y2) { # returns distance from point to line at any place in or out of segment
-# PointLineX <-  function (PtX, PtY, X1, Y1, X2, Y2) { # returns X-value of point on a line perpendicular to point off line
-# PointLineY <-  function (PtX, PtY, X1, Y1, X2, Y2) { # returns Y-value of point on a line perpendicular to point off line
-# SegLength <-  function(X1, Y1, X2, Y2){  # returns distance from point 1 to point 2, ends of a line segment
-
-# SegTable.create <- function() { # import the boundary segment table
-# Refuge.xybound <- function(SegTable) { # return Refuge xy bounding box corners
-# is.in_polygon <- function(x, y, pol_x, pol_y) { # Return logical TRUE if X,Y is inside polygon
+#                COORDINATE CONVERSION FUNCTIONS TRANSLATED FROM VBA
+# XCalculate <- function (Lat, Lon)  # return x coordinate from lat/long
+# YCalculate <- function (Lat, Lon)  # return y coordinate from lat/long
+# LongCalculate <-  function (X, Y)  # return long from UTM xy
+# LatCalculate <- function (X, Y)    # return lat from UTM xy
+#
+#                 OTHER FUNCTIONS TRANSLATED FROM VBA
+# CanalMeters <- function (X, Y, SegTable)  # returns clockwise canal distance
+# CanalDistance <-  function (X, Y, SegTable)  # returns distance to canal
+# NearestSeg <-  function (X, Y, SegTable)  # returns closest segment to x,y
+# PointLineCalc <- function(PtX, PtY, X1, Y1, X2, Y2)  # returns list(xmin, ymin, PointLineDist)
+# PointSegDistance <-  function (PtX, PtY, X1, Y1, X2, Y2)  # returns distance from point to a line segment
+# PointLineDistance <-  function (PtX, PtY, X1, Y1, X2, Y2)  # returns distance from point to line at any place in or out of segment
+# PointLineX <-  function (PtX, PtY, X1, Y1, X2, Y2)  # returns X-value of point on a line perpendicular to point off line
+# PointLineY <-  function (PtX, PtY, X1, Y1, X2, Y2)  # returns Y-value of point on a line perpendicular to point off line
+# SegLength <-  function(X1, Y1, X2, Y2)  # returns distance from point 1 to point 2, ends of a line segment
+#
+#                 OTHER USEFUL FUNCTIONS
+# SegTable.create <- function()  # import the boundary segment table
+# Refuge.xybound <- function(SegTable)  # return Refuge xy bounding box corners
+# is.in_polygon <- function(x, y, pol_x, pol_y)  # Return logical TRUE if X,Y is inside polygon
+# Cells_in <- function(x, y, dxy = 25, cell.list = NULL) # returns a vector of cells containing the point x,y
 
 # ---------------- Translated lat/long VBA Macros ----------------
 # This module contains functions to approximately convert 
