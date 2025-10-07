@@ -15,27 +15,31 @@ library(zoo)
 library(lubridate)
 library(sf)
 library(terra)
+library(readxl)
 # Input is a station name: e.g. G251
 # Start date: e.g., '2015-01-01'
 # End date: e.g., '2019-06-30'
 # wy: water year start month, 4 for State WY, 9 for Park WY
 # PREF.prefer is TRUE then prefer the dbkey with RECORDER==PREF
+# DBKET.select is a selected timeseries, if not NA this overrides staName 
 
-flow.formatter <- function(staName, sdate, edate, wy = 4, 
-                           PREF.prefer=FALSE, quiet=TRUE)
-  { # begin function
-  # download flow data for site=staName
-  
-  dbkeys.Q.read <- function() { # load flow dbkey table from csv file
+  dbkeys.Q.read <- function() { # load flow dbkey table from file
+    # OLD FILE
     # dbkeys <- read.csv('C:/donatto/lox/r_codes/dbkeysFlow.csv',header=T)
-    dbkeys <- read.csv('../DataSets/Surratt-2025-09/dbkyes4Waldon.csv',header=T)
+    #dbkeys <- read.csv('../DataSets/Surratt-2025-09/dbkyes4Waldon3.csv',header=T)
     # remove the Dbkeys column which has leading zeros removed
-    dbkeys <- dbkeys[, -which(names(dbkeys) == "Dbkey")]
+    #dbkeys <- dbkeys[, -which(names(dbkeys) == "Dbkey")]
     
-    dbkeys$Start.Date <- as.Date(as.character(dbkeys$Start.Date),'%m/%d/%Y')
-    dbkeys$End.Date <- as.Date(as.character(dbkeys$End.Date),'%m/%d/%Y')
+    # INPUT NEWLY BUILT FILE
+    #   load table of timeseries from Excel fie QTimeSeries.xlsx
+    dbkeys <- read_excel(
+      "G:/My Drive/ProjectsPapersConferences/Loxahatchee/LoxModelUpdate/39-BoxProject/DataSets/Qupdate/QTimeSeries.xlsx", 
+      sheet = "CA1_FLOW_DA")
     
-    dbkeys <- dbkeys[-which(is.na(dbkeys$Start.Date)),] # remove NA observation
+    dbkeys$Start.Date <- as.Date(as.character(dbkeys$Start.Date)) #,'%m/%d/%Y')
+    dbkeys$End.Date <- as.Date(as.character(dbkeys$End.Date))     #,'%m/%d/%Y')
+    
+    # dbkeys <- dbkeys[-which(is.na(dbkeys$Start.Date)),] # remove NA observation
     # convert lat/long in degrees minutes seconds to decimal degrees
     dbkeys$Long <- as.numeric(substr(dbkeys$Longitude,1,2))+
       (as.numeric(substr(dbkeys$Longitude,3,4))/60)+
@@ -46,37 +50,56 @@ flow.formatter <- function(staName, sdate, edate, wy = 4,
       (as.numeric(substr(dbkeys$Latitude,5,nchar(dbkeys$Latitude)))/3600)
     # set longitude to negative because it is west
     dbkeys$Long <- -1*(dbkeys$Long)
+    
+    # Compute UTM coordinates
+    # make cord.dec a spatial object with coordinates as decimal degrees
+    #  crs=4326 means spatial data is using WGS 84 geographic coordinate system, 
+    #  with coordinates expressed in degrees of latitude and longitude
+    cord.dec <- st_as_sf(dbkeys,coords=c('Long','Lat'),crs=4326)
+    #cord.dec = SpatialPoints(cbind(-dbkeys$Long, dbkeys$Lat), proj4string = CRS("+proj=longlat"))
+    #cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:26917"))
+    # crs=26917 is EPSG:26917 CRS known as NAD83 / UTM zone 17N
+    cord.UTM <- st_transform(cord.dec,crs=26917)
+    #cord.UTM <- spTransform(cord.dec, CRS("+proj=latlong +datum=NAD83"))
+    
+    dbkeys$Xutm <- st_coordinates(cord.UTM$geometry)[,1] # cord.UTM@coords[1:nrow(dbkeys)]
+    dbkeys$Yutm <- st_coordinates(cord.UTM$geometry)[,2]  #cord.UTM@coords[(nrow(dbkeys)+1):(nrow(dbkeys)+nrow(dbkeys))]
+    
     # replace missing Recorder records with text 'none'
-    dbkeys$Recorder[which(is.na(dbkeys$Recorder))] <- 'none'
+    #dbkeys$Recorder[which(is.na(dbkeys$Recorder))] <- 'none'
+    
     return(dbkeys)
   } # end function dbkeys.read
+
+
+flow.formatter <- function(staName, sdate, edate, wy = 4, 
+                           PREF.prefer=FALSE, quiet=TRUE,
+                           DBKEY.select = NA)
+{ # begin function
+  # download flow data for site=staName
+  
   dbkeys <- dbkeys.Q.read()
-  
-  # Compute UTM coordinates
-  # make cord.dec a spatial object with coordinates as decimal degrees
-  #  crs=4326 means spatial data is using WGS 84 geographic coordinate system, 
-  #  with coordinates expressed in degrees of latitude and longitude
-  cord.dec <- st_as_sf(dbkeys,coords=c('Long','Lat'),crs=4326)
-  #cord.dec = SpatialPoints(cbind(-dbkeys$Long, dbkeys$Lat), proj4string = CRS("+proj=longlat"))
-  #cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:26917"))
-  # crs=26917 is EPSG:26917 CRS known as NAD83 / UTM zone 17N
-  cord.UTM <- st_transform(cord.dec,crs=26917)
-  #cord.UTM <- spTransform(cord.dec, CRS("+proj=latlong +datum=NAD83"))
-  
-  dbkeys$Xutm <- st_coordinates(cord.UTM$geometry)[,1] # cord.UTM@coords[1:nrow(dbkeys)]
-  dbkeys$Yutm <- st_coordinates(cord.UTM$geometry)[,2]  #cord.UTM@coords[(nrow(dbkeys)+1):(nrow(dbkeys)+nrow(dbkeys))]
  
-  # select the records for the selected site
-  ss<-dbkeys[which(grepl(staName,dbkeys$Site)),]
+  if (! is.na(DBKEY.select)) { # not NA, use the DBKEY provided
+    ss <- dbkeys[dbkeys$DBKEY == DBKEY.select,]
+    dbkeySelect <- DBKEY.select
+    dbkey.i <- which(dbkeys$DBKEY==dbkeySelect)
+    staName <- ss$Site
+  } # end if
+  else { # select the records for the selected site
+    ss<-dbkeys[which(grepl(staName,dbkeys$Site)),]
   
-  # days of each time series overlapping the desired period
-  ss$dateDel <- pmax(0,pmin(ss$End.Date, edate) - pmax(ss$Start.Date, sdate))
-  
-  # if there are no overlapping dates then return
-  if (max(ss$dateDel) == 0) {
-    if (quiet == FALSE) print(c('no data for site ', staName))
-    return(NA)
-  }
+ 
+    
+    # days of each time series overlapping the desired period
+    ss$dateDel <- pmax(0,pmin(ss$End.Date, edate) - pmax(ss$Start.Date, sdate))
+    
+    # if there are no overlapping dates then return
+    if (max(ss$dateDel) == 0) {
+      if (quiet == FALSE) print(c('no data for site ', staName))
+      return(NA)
+    
+    } # end if
   
   # select the best dbkey
   if (PREF.prefer & any(ss$Recorder=='PREF')) { # select PREF time series
@@ -87,7 +110,9 @@ flow.formatter <- function(staName, sdate, edate, wy = 4,
     # select the timeseries with longest period overlapping the desired period
     
     dbkeySelect <- ss$DBKEY[which.max(ss$dateDel)]
+    } # end else
   } # end else
+  
   dbkey.i <- which(dbkeys$DBKEY==dbkeySelect) # index of selected DBKEY
   
   # old new versiondbkeys$DBKEY[which(grepl(staName,dbkeys$Site)&which(dbkeys$Start.Date==min(dbkeys$Start.Date))&dbkeys$End.Date>=as.Date(edate))][1]
@@ -113,19 +138,22 @@ flow.formatter <- function(staName, sdate, edate, wy = 4,
   
   
   # 3) Apply file to file.path 
-  #local<-file.path("flow.csv")
-  local<-file.path("../DataSets/Surratt-2025-09/flow.csv")
-  download.file(url,local,method='libcurl')
-  
+    #local<-file.path("flow.csv")
+    local<-file.path("../DataSets/Surratt-2025-09/flow.csv")
+    download.file(url,local,method='libcurl')
+    
   # 4) Get the data, separate to columns, names columns
   all_content <- readLines(local)
-  if(isTRUE((grepl('FOUND',all_content[2])))){ # dbkey not found
-    if (quiet==FALSE) print('No data returned for station ', staName)
+  index1 <- which(grepl("Daily\\b",all_content)) # Find beginning of data
+  if(isTRUE((grepl('FOUND',all_content[2]))) | # dbkey not found
+    (length(index1) == 0)){ # no data
+    if (quiet==FALSE) {
+      print(paste('No data returned for station=', staName,
+                  ', DBKEY=', dbkeySelect))
+      print(all_content) 
+      } # end if
     return(NA)
   } # end if
-  # Find beginning of data
-  index1 <- which(grepl("Daily\\b",all_content))
-  
   meta <- all_content[2:index1]        # header data
   dataset <- all_content[-1:-index1]   # data
   # df.flow <- read.csv(textConnection(dataset),header=T, stringsAsFactor=F)
@@ -142,9 +170,14 @@ flow.formatter <- function(staName, sdate, edate, wy = 4,
   #names(df.flow) <- c('Date',df.meta[1,1])
   names(df.flow) <- c('Date', 'Qualifier', 'CFS')
   df.flow$Date <- as.Date(df.flow$Date,'%d-%b-%Y')
+  # remove the final 2 rows which were text rather than data in the download
+  df.flow <- df.flow[1:(length(df.flow$Date)-2),]
   
   # set flow to 0 if negative  ** use if outflow is not needed
   # df.flow[2][df.flow[2]<0] <- 0
+  
+  # add flow in meters^3/day
+  df.flow$m3d <- df.flow$CFS * 2446.575546
   
   # add water-year and Month-year to dataframe
   df.flow <- cbind(
@@ -170,16 +203,21 @@ flow.formatter <- function(staName, sdate, edate, wy = 4,
          main=staName)
   } # end if
   
-  ret.list <- list(df.flow,my.flow,wy.flow,dbkeys, meta, staName, dbkey.i)
-  names(ret.list) <- c('Q', 'Q.MonYr', 'Q.WY', 'DBKEYS', 'Q.head', 'structName', 'structIndex')
+  ret.list <- list(df.flow,my.flow,wy.flow,dbkeys, meta, 
+                   staName, dbkeySelect, dbkey.i)
+  names(ret.list) <- c('Q', 'Q.MonYr', 'Q.WY', 'DBKEYS', 'Q.head', 
+                       'structName', 'DBKEY.select', 'structIndex')
   
-  file.save <- paste('../DataSets/Qupdate/',staName,'.Q.Rdata', sep = '')
+  file.save <- paste('../DataSets/Qupdate/',
+                     staName, '_', dbkeySelect, '.Q.Rdata', sep = '')
   save(ret.list, file = file.save)
   return(ret.list)
 } # end function flow.formatter
 
+if (FALSE) { # test flowformatter 
 x <- flow.formatter(sname, sdate = sdate, edate = edate,
                     wy = 4, PREF.prefer = TRUE, quiet = FALSE)
+}
 
 
 
