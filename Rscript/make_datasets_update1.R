@@ -21,7 +21,27 @@ nstruct <- 19 # number of inflow/outflow structures
 # date and time constants
 R.BaseDate <- as.Date(0)   # day zero for R dates is 01Jan1970
 Model.BaseDate <- as.Date('1995-01-01') # earliest date for model, day=1
-Model.EndDate <-  as.Date('2009-06-30') # last possible date for model
+Model.EndDate <-  as.Date('2025-06-30') # last possible date for model
+
+Update.StartDate <- as.Date('2009-07-01') # begin update
+
+USGS_Stages <- USGS_Stages.read() # data for the 6 USGS stage gages in Refuge
+
+A1.historic <- function(d) { 
+  # return logical vector, TRUE if 1-8C stage is above A1
+  # d is a vector of dates
+  # global: USGS_Stages
+  is.above <- NULL
+  dy <- NULL
+  stage <- NULL
+  for (i in 1:length(d)) {
+    dy[i] <- Date2Day(as.Date(d[i]))
+    afloor[i]<- A1Floor(dy[i])
+    stage[i] <- USGS_Stages$GS8C[USGS_Stages$DATE==d[i]]
+    is.above[i] <-(stage[i] > afloor[i])
+  } # end for i
+  return(list(is.above=is.above, a1=afloor, stage=stage))
+} # end function A1.historic
 
 # ____________________________________________________________
 # make cell, link, & struct dataframes filled with NA values
@@ -116,6 +136,10 @@ days <- 1:ndays
 dates <- Model.BaseDate+days-1
 # NAflow <- rep(NA,ndays)
 
+# read the update flows
+Q.data.update <- read_excel("../DataSets/Qupdate/Qdataupdate.xlsx", 
+                          sheet = "Qdataupdate")
+
 # import historic inflow/outflow/P/ET values (m/day)
 #   consistent structure names were used across these datasets
 # daily total inflow by structure
@@ -130,6 +154,30 @@ Outflow <- read_excel("../DataSets/Update_Madonna_Input/OUTFLOW39.xlsx",
 # e.g. hurricanes (S10s) and water supply (S39)
 NonReg<- read_excel("../DataSets/Update_Madonna_Input/Regulation39.xlsx", 
                   sheet = "Regulation", range = "G1:L5296")
+
+# update inflow
+x <- Q.data.update
+x[,3:(nstruct+2)][x[,3:(nstruct+2)]<0] <- 0  # set negative flows to zero
+Inflow <- rbind(Inflow,x)
+
+# update outflow
+x <- Q.data.update
+x[,3:(nstruct+2)][x[,3:(nstruct+2)]>0] <- 0  # set positive flows to zero
+x[,3:(nstruct+2)] <- -x[,3:(nstruct+2)]      # change sign to positive
+# non-regulatory outflows (large storm emergency release or water supply)
+# names(NonReg) = "DATE" "DAY"  "S10A" "S10C" "S10D" "S39"
+xNR <- x[, c(1, 2, 21, 20, 19, 3)]  # DATE, DAY, S10A, S10C, S10D, S39
+# no S10 non-regulatory releases, assume all S-39 flows are water supply
+xNR[,3:5] <- 0 # change if evidence of emergency release is found
+# s39 non-regulatory flow - if 1-8C stage was above A1 on regulation schedule
+#  then assume S39 flow was regulatory and remove it
+is.reg <- A1.historic(xNR$DATE)$is.above # logical vector
+xNR[is.reg,6] <- 0
+# update dataframes
+Outflow <- rbind(Outflow, x)
+NonReg <-  rbind(NonReg, xNR)
+
+rm(x, xNR, is.reg) # cleanup
 
 # precipitation and evapotranspiration  
 PET <- read_excel("../DataSets/Update_Madonna_Input/PET39.xlsx", 
