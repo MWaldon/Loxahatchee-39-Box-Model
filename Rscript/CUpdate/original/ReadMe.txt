@@ -1,0 +1,1 @@
+This folder contains the scripts sent to M. Waldon by Dr. Donatto Surratt in email dated October 7, 2025. These scripts download data from the SFWMD.gov DBHYDRO database.
