@@ -58,7 +58,8 @@ library(readxl)   # read Excel worksheets
 library(sf)       # shape files
 library(plotrix)  # plotting functions
 library(matrixStats) # needed for colMin
-
+library(readr)    # read csv text file
+library(lubridate)# date functions
 
 #---------------------------DEPTH-----------------------------------------------
 Cell.Depth.calc <- function(v) { # returns depth(m) as a vector 1..ncell
@@ -426,8 +427,58 @@ USGS_Stages.read <- function() { # read historic USGS gague data for graphs
   # add datum correction estimate
   USGS_Stages$North <- USGS_Stages$North + 0.48
   USGS_Stages$South <- USGS_Stages$South + 0.48
+  
+  # read update
+  USGS_Stage_Update_dld <- read_csv( # read downloaded USGS gage data 
+    "../DataSets/USGSupdate/USGS_Stage_Update.csv", 
+    col_types = cols(SOURCE_TIMESERIES = col_character()), 
+    skip = 45)
+  USGS_Stage.dbkeys <- unique(USGS_Stage_Update_dld$TIMESERIESID)
+  
+  # DBKEYS: "15809" "AO104" "FE775" "FE776" "FE777" "MW671" "RW494"
+  db_15809 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "15809",]
+  db_AO104 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "AO104",]
+  db_FE775 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "FE775",]
+  db_FE776 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "FE776",]
+  db_FE777 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "FE777",]
+  db_MW671 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "MW671",]
+  db_RW494 <- USGS_Stage_Update_dld[USGS_Stage_Update_dld$TIMESERIESID == "RW494",]
+  
+  rm(USGS_Stage_Update_dld) #cleanup, no longer needed
+  rm(db_AO104)  # 1-8T gage, datum is STG88, will instead use db_15809 
+  
+  # check if remaining DATE columns are all equal (must fix if not equal)
+  #  all have length of 5936
+    x <- identical(db_15809$TIMESTAMP,db_FE775$TIMESTAMP) &
+       identical(db_15809$TIMESTAMP,db_FE776$TIMESTAMP) &
+       identical(db_15809$TIMESTAMP,db_FE777$TIMESTAMP) &
+       identical(db_15809$TIMESTAMP,db_MW671$TIMESTAMP) &
+       identical(db_15809$TIMESTAMP,db_RW494$TIMESTAMP) 
+  if (!x) { # if all date vectors are not equal
+    print('ERROR date vectoors do not match')
+    } # end if 
+  
+  # Create final update dataframe
+  # STATION  "GS8T"  "GS7"   "GS8C"  "GS9"   "South" "North" "DATE" 
+  # DBKEY    15809  FE775    FE776  FE777     MW671   RW494
+  Supdate <- data.frame(GS8T=db_15809$VALUE,
+                        GS7 =db_FE775$VALUE,
+                        GS8C=db_FE776$VALUE,
+                        GS9 =db_FE777$VALUE,
+                        South=db_MW671$VALUE,
+                        North=db_RW494$VALUE,
+                        DATE =db_15809$TIMESTAMP)
+  # convert all stages from feet to meters by dividing by 3.28084 ft/m
+  Supdate[,-7] <- Supdate[,-7]/3.28084
+  
+  USGS_Stages <- rbind(USGS_Stages, Supdate) # combine old and updated stages
+  
   return(USGS_Stages)
 } # end USGS_Stages.read
+
+# USGS_Stages <- USGS_Stages.read()
+# plot(USGS_Stages$DATE,USGS_Stages$GS8C, type='l')
+# lines(USGS_Stages$DATE, A1Floor(Date2Day(USGS_Stages$DATE)), col='red')
 
 Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gague sites
   # gagues is a vector of 1 or 2 gauges for plotting
