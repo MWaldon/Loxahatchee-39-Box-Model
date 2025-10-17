@@ -7,6 +7,7 @@
 #    1. Cells, 2. Links, or 3. Structures
 
 library(readxl) # used to read data from Excel files
+library(dplyr)  # needed for inner_join function
 
 # ____________________________________________________________
 # remove all variables from the environment
@@ -21,7 +22,7 @@ nstruct <- 19 # number of inflow/outflow structures
 # date and time constants
 R.BaseDate <- as.Date(0)   # day zero for R dates is 01Jan1970
 Model.BaseDate <- as.Date('1995-01-01') # earliest date for model, day=1
-Model.EndDate <-  as.Date('2025-06-30') # last possible date for model
+Model.EndDate <-  as.Date('2025-04-29') # last possible date for model
 
 Update.StartDate <- as.Date('2009-07-01') # begin update
 
@@ -136,10 +137,6 @@ days <- 1:ndays
 dates <- Model.BaseDate+days-1
 # NAflow <- rep(NA,ndays)
 
-# read the update flows
-Q.data.update <- read_excel("../DataSets/Qupdate/Qdataupdate.xlsx", 
-                          sheet = "Qdataupdate")
-
 # import historic inflow/outflow/P/ET values (m/day)
 #   consistent structure names were used across these datasets
 # daily total inflow by structure
@@ -156,26 +153,36 @@ NonReg<- read_excel("../DataSets/Update_Madonna_Input/Regulation39.xlsx",
                   sheet = "Regulation", range = "G1:L5296")
 
 # update inflow
-x <- Q.data.update
+
+# read the update flows
+Q.data.update <- read_excel("../DataSets/Qupdate/Qdataupdate.xlsx", 
+                            sheet = "Qdataupdate")
+Q.data.update$DATE <- as.Date(Q.data.update$DATE) # date object vector
+x <- Q.data.update # temporary object
 x[,3:(nstruct+2)][x[,3:(nstruct+2)]<0] <- 0  # set negative flows to zero
 Inflow <- rbind(Inflow,x)
+Inflow$DATE <- as.Date(Inflow$DATE)
 
 # update outflow
 x <- Q.data.update
 x[,3:(nstruct+2)][x[,3:(nstruct+2)]>0] <- 0  # set positive flows to zero
 x[,3:(nstruct+2)] <- -x[,3:(nstruct+2)]      # change sign to positive
+
 # non-regulatory outflows (large storm emergency release or water supply)
 # names(NonReg) = "DATE" "DAY"  "S10A" "S10C" "S10D" "S39"
 xNR <- x[, c(1, 2, 21, 20, 19, 3)]  # DATE, DAY, S10A, S10C, S10D, S39
-# no S10 non-regulatory releases, assume all S-39 flows are water supply
-xNR[,3:5] <- 0 # change if evidence of emergency release is found
+xNR$DATE <- as.Date(xNR$DATE) # date object vector
+# no S10 non-regulatory releases, 
+xNR[,3:5] <- 0 # change this if evidence of emergency release is found
 # s39 non-regulatory flow - if 1-8C stage was above A1 on regulation schedule
 #  then assume S39 flow was regulatory and remove it
 is.reg <- A1.historic(xNR$DATE)$is.above # logical vector
-xNR[is.reg,6] <- 0
+xNR[is.reg,6] <- 0 # set S39 flows to zero when above A1 floor 
 # update dataframes
 Outflow <- rbind(Outflow, x)
+Outflow$DATE <- as.Date(Outflow$DATE)
 NonReg <-  rbind(NonReg, xNR)
+NonReg$DATE <- as.Date(NonReg$DATE)
 
 rm(x, xNR, is.reg) # cleanup
 
@@ -187,31 +194,34 @@ ET.update <- read_excel("../DataSets/X09_25/ET/ET.xlsx",
                  sheet = "ET", range = "A5297:C11078", 
                  col_names = FALSE)
 names(ET.update) <- c("DAY", "DATE", "ET")
+ET.update$DATE <- as.Date(ET.update$DATE)
 ET.update$ET <- ET.update$ET/1000 # convert mm/day to m/day
 # Read extended precipitation
 P.update <- read_excel("../DataSets/X09_25/Rain/Rain.xlsx", 
               sheet = "Rain", range = "A5308:C11151", col_names = FALSE)
 names(P.update) <- c("DAY", "DATE", "P")
+P.update$DATE <- as.Date(P.update$DATE)
 P.update$P <- P.update$P/1000 # convert mm/day to m/day
 # update PET
 PET.update <- inner_join(P.update,ET.update)
 PET <- rbind(PET, PET.update)
 PET$DATE <- as.Date(PET$DATE)
+
+rm(ET.update, P.update, PET.update) # cleanup
 # plot(PET$DATE,PET$P)
 # plot(PET$DATE,PET$ET)
 # summary(PET)
 # ____________________________________________________________    
-# structure dataframe
+# model structure dataframe
 # set names of all inflow/outflow structures
 struct$name <- names(Inflow)[3:(nstruct+2)] 
 # identify which are inflow or outflow
 for (i in 1:nstruct) {
-sumQ <- sum(Inflow[,i+2]) # sum inflows for this structure
-struct$inp[i] <- (sumQ>1) # set to true if there is inflow
-sumQ <- sum(Outflow[,i+2]) # sum inflows for this structure
-struct$out[i] <- (sumQ>1) # set to true if there is inflow
-
-}
+  sumQ <- sum(Inflow[,i+2]) # sum inflows for this structure
+  struct$inp[i] <- (sumQ>1) # set to true if there is inflow
+  sumQ <- sum(Outflow[,i+2]) # sum inflows for this structure
+  struct$out[i] <- (sumQ>1) # set to true if there is inflow
+} # end for i
 # assign cell number associated with each structure
 struct$cell[struct$name == 'G301']  <- 2
 struct$cell[struct$name == 'G310']  <- 3
@@ -234,7 +244,7 @@ struct$cell[struct$name == 'G300']  <- 11
 struct$cell[struct$name == 'S5A']   <- 11
 struct$cell[struct$name == 'S5AS']  <- 11  #  corrected S5As cell
 
-pumps <- c('ACME2', 'ACME1', 'S362', 'S5A', 'G310', 'G251')
+pumps <- c('ACME2', 'ACME1', 'S362', 'S5A', 'G310', 'G251', 'S6')
 struct$type[struct$name %in% pumps] <- "Pump"
 struct$type[!(struct$name %in% pumps)] <- "Gate"
 
@@ -249,11 +259,27 @@ CanalVS <- read_excel("../DataSets/Volume-Stage-Canal.xlsx",
                     sheet = "S-V")
 
 # ____________________________________________________________
-# read observed stage & concentration values for calibration
+# read observed stage values for calibration
 # observed stage row 1=name, 2=cell#, 3..n=day & stage
+#  (cell # in row 2 are not correct, day is actually day-1)
 Stage.Obs <- read_excel("../DataSets/obs_stageall.xlsx", 
                       sheet = "obs_stageall")
+
+# read new downloads
+# from USGS
+USGS_Stage_Update.obs <- read_excel(
+  "../DataSets/USGSupdate/USGS_download/USGS_Stage_Update.xlsx", 
+  sheet = "AllSites", range = "A10:K11149", col_types = c("date", 
+          "numeric", "numeric", "numeric", "numeric", "numeric",  
+          "numeric", "numeric", "numeric", "numeric", "numeric"))
 # replace stage=0 with NA
+x <- USGS_Stage_Update.obs[,-1:-2] # keep only the data columns 3:11
+x[x==0] <- NA # set all values equal to zero to NA
+USGS_Stage_Update.obs[,3:11] <- x # replace the stage data
+rm(x) # cleanup
+
+# ****** may need further work to make the new data fit prior coding ****** 
+
 
 # ____________________________________________________________
 
