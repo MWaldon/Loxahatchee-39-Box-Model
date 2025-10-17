@@ -180,14 +180,13 @@ library(readxl) # used to read data from Excel files
   #   Cell, Volume(m^3), Stage(m), Depth(m), AvArea(m^2)
   CanalVS <- read_excel("../DataSets/Volume-Stage-Canal.xlsx", 
                         sheet = "S-V")
-
+  
 # ____________________________________________________________
   # read observed stage & concentration values for calibration
   # observed stage row 1=name, 2=cell#, 3..n=day & stage
+  #  (cell # in row 2 are not correct, day is actually day-1)
   Stage.Obs <- read_excel("../DataSets/obs_stageall.xlsx", 
-                           sheet = "obs_stageall")
-  # replace stage=0 with NA
-
+  
 # ____________________________________________________________
   
   save(Model.BaseDate, Model.EndDate,
