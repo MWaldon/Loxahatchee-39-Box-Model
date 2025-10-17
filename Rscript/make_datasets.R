@@ -186,6 +186,7 @@ library(readxl) # used to read data from Excel files
   # observed stage row 1=name, 2=cell#, 3..n=day & stage
   #  (cell # in row 2 are not correct, day is actually day-1)
   Stage.Obs <- read_excel("../DataSets/obs_stageall.xlsx", 
+                          sheet = "obs_stageall")
   
 # ____________________________________________________________
   
