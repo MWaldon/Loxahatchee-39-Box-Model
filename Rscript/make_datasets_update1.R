@@ -12,6 +12,8 @@ library(dplyr)  # needed for inner_join function
 # ____________________________________________________________
 # remove all variables from the environment
 rm(list = ls())
+
+source('39BoxFunctions.R') # load functions
 # ____________________________________________________________
 # set constants
 # Geometry of cells and links
