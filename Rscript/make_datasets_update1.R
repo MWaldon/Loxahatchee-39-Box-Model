@@ -33,17 +33,26 @@ USGS_Stages <- USGS_Stages.read() # data for the 6 USGS stage gages in Refuge
 A1.historic <- function(d) { 
   # return logical vector, TRUE if 1-8C stage is above A1
   # d is a vector of dates
-  # global: USGS_Stages
+  # global: USGS_Stage_Update.obs (see this script below)
   is.above <- NULL
   dy <- NULL
   stage <- NULL
+  afloor <- NULL
   for (i in 1:length(d)) {
     dy[i] <- Date2Day(as.Date(d[i]))
     afloor[i]<- A1Floor(dy[i])
-    stage[i] <- USGS_Stages$GS8C[USGS_Stages$DATE==d[i]]
+    stage[i] <- 
+      USGS_Stage_Update.obs$`1-8Cfilled`[USGS_Stage_Update.obs$Date==d[i]]
     is.above[i] <-(stage[i] > afloor[i])
   } # end for i
   return(list(is.above=is.above, a1=afloor, stage=stage))
+  # test plot
+  # x <- A1.historic(USGS_Stage_Update.obs$Date)
+  # plot(USGS_Stage_Update.obs$Date, x$stage, type='l', 
+  #     xlab = 'Date', ylab = 'Stage (m)')
+  # points(USGS_Stage_Update.obs$Date[x$is.above], x$stage[x$is.above], 
+  #        col='red', cex=0.5)
+  # lines(USGS_Stage_Update.obs$Date, x$a1, type='l', col='red')
 } # end function A1.historic
 
 # ____________________________________________________________
@@ -133,6 +142,41 @@ link$type[23:52] <- 'mm'
 rm(Rtable, Wtable, UDtable)
 
 # ____________________________________________________________
+# read observed stage values for calibration
+# observed stage row 1=name, 2=cell#, 3..n=day & stage
+#  (cell # in row 2 are not correct, day is actually day-1)
+Stage.Obs <- read_excel("../DataSets/obs_stageall.xlsx", 
+                        sheet = "obs_stageall")
+Stage.Obs <- Stage.Obs[-1,] # remove row 1
+# rename 'day' to 'DAY'
+names(Stage.Obs) <- c('DAY',names(Stage.Obs[-1]))
+Stage.Obs$DAY <- Stage.Obs$DAY+1 # day starts at 1 not zero
+Stage.Obs$DATE <- Day2Date(Stage.Obs$DAY)
+
+# read new downloads from USGS
+USGS_Stage_Update.obs <- read_excel(
+  "../DataSets/USGSupdate/USGS_download/USGS_Stage_Update.xlsx", 
+  sheet = "AllSites", range = "A10:Q11149", col_types = c("date", 
+          "numeric", "numeric", "numeric", "numeric", "numeric",  
+          "numeric", "numeric", "numeric", "numeric", "numeric",
+          "numeric", "numeric", "numeric", "numeric", "numeric",
+          "numeric"))
+USGS_Stage_Update.obs$Date <- as.Date(USGS_Stage_Update.obs$Date)
+# replace stage=0 with NA, convert ft to m
+x <- USGS_Stage_Update.obs[,-1:-2] # keep only the data columns 3:17
+x <- x[-10:-14] # remove columns 10-14 used to calculate column 1-8Cfilled
+x[x==0] <- NA # set all values equal to zero to NA
+x <- x/3.28084 # convert feet to meters
+USGS_Stage_Update.obs <- cbind(USGS_Stage_Update.obs[,1:2], x) 
+# plot(USGS_Stage_Update.obs$Date,USGS_Stage_Update.obs$`1-8Cfilled`,
+#      type='l', col='red')
+# lines(USGS_Stage_Update.obs$Date,USGS_Stage_Update.obs$`1-8C`, col='darkblue')
+rm(x) # cleanup
+
+# ****** may need further work to make the new data fit prior coding ****** 
+
+
+# ____________________________________________________________
 # inflow & outflow dataframes
 ndays <- as.numeric(Model.EndDate) - as.numeric(Model.BaseDate) +1
 days <- 1:ndays
@@ -144,15 +188,17 @@ dates <- Model.BaseDate+days-1
 # daily total inflow by structure
 Inflow <- read_excel("../DataSets/Update_Madonna_Input/INFLOW39.xlsx", 
                    sheet = "INFLOW", range = "x2:AR5297")
-
+Inflow$DATE <- as.Date(Inflow$DATE)
 # daily total ourflow by structure
 Outflow <- read_excel("../DataSets/Update_Madonna_Input/OUTFLOW39.xlsx", 
                     sheet = "OUTFLOW",range = "Y2:AS5297")
+Outflow$DATE <- as.Date(Outflow$DATE)
 
 # daily total outflow by structure not related to the Regulation Schedule
 # e.g. hurricanes (S10s) and water supply (S39)
 NonReg<- read_excel("../DataSets/Update_Madonna_Input/Regulation39.xlsx", 
                   sheet = "Regulation", range = "G1:L5296")
+NonReg$DATE <- as.Date(NonReg$DATE)
 
 # update inflow
 
@@ -187,6 +233,9 @@ NonReg <-  rbind(NonReg, xNR)
 NonReg$DATE <- as.Date(NonReg$DATE)
 
 rm(x, xNR, is.reg) # cleanup
+# plot(Outflow$DATE, Outflow$S39, type='l', 
+#      xlab = 'Date',ylab = 'S-39 outflow (m3/d)')
+# points(NonReg$DATE, NonReg$S39, col='green')
 
 # precipitation and evapotranspiration  
 PET <- read_excel("../DataSets/Update_Madonna_Input/PET39.xlsx", 
@@ -259,28 +308,6 @@ rm(sumQ,i, pumps)
 #   Cell, Volume(m^3), Stage(m), Depth(m), AvArea(m^2)
 CanalVS <- read_excel("../DataSets/Volume-Stage-Canal.xlsx", 
                     sheet = "S-V")
-
-# ____________________________________________________________
-# read observed stage values for calibration
-# observed stage row 1=name, 2=cell#, 3..n=day & stage
-#  (cell # in row 2 are not correct, day is actually day-1)
-Stage.Obs <- read_excel("../DataSets/obs_stageall.xlsx", 
-                      sheet = "obs_stageall")
-
-# read new downloads
-# from USGS
-USGS_Stage_Update.obs <- read_excel(
-  "../DataSets/USGSupdate/USGS_download/USGS_Stage_Update.xlsx", 
-  sheet = "AllSites", range = "A10:K11149", col_types = c("date", 
-          "numeric", "numeric", "numeric", "numeric", "numeric",  
-          "numeric", "numeric", "numeric", "numeric", "numeric"))
-# replace stage=0 with NA
-x <- USGS_Stage_Update.obs[,-1:-2] # keep only the data columns 3:11
-x[x==0] <- NA # set all values equal to zero to NA
-USGS_Stage_Update.obs[,3:11] <- x # replace the stage data
-rm(x) # cleanup
-
-# ****** may need further work to make the new data fit prior coding ****** 
 
 
 # ____________________________________________________________
