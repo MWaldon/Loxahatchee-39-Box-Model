@@ -134,11 +134,17 @@ derivs <- function(simtime, State, Params) {
     #vinit <- Cell.Volume.calc(BMSimObsStage[1,15:53] - cell$E0) # for match to BM 39-Box  
 
     # set up simulation output matricies
-    sim.Volume  <- matrix(data = NA, nrow = Stop.Day-Start.Day+2, ncol = ncell)
-    sim.Depth   <- matrix(data = NA, nrow = Stop.Day-Start.Day+2, ncol = ncell)
-    sim.Stage   <- matrix(data = NA, nrow = Stop.Day-Start.Day+2, ncol = ncell)
-    sim.Outflow <- matrix(data = NA, nrow = Stop.Day-Start.Day+2, ncol = ncanal)
-    sim.Linkflow<- matrix(data = NA, nrow = Stop.Day-Start.Day+2, ncol = nlink)
+    nr <- Stop.Day-Start.Day+2 # number of rows
+    sim.Volume  <- matrix(data = NA, nrow = nr, ncol = ncell)
+    sim.Depth   <- matrix(data = NA, nrow = nr, ncol = ncell)
+    sim.Stage   <- matrix(data = NA, nrow = nr, ncol = ncell)
+    sim.Outflow <- matrix(data = NA, nrow = nr, ncol = ncanal)
+    sim.Linkflow<- matrix(data = NA, nrow = nr, ncol = nlink)
+    # set up output sim time dataframe
+    sim.time <- data.frame(time = as.numeric(0:(Stop.Day-Start.Day+1)),
+                           DAY = Start.Day:(Stop.Day+1))
+    sim.time$DATE <- Day2Date(sim.time$DAY)
+    sim.time$sub  <- as.integer(sim.time$DATE - Model.BaseDate +1)
     
     # fill the initial row of the simulation output matricies
     sim.Volume[1,]   <- Vinit
@@ -159,9 +165,10 @@ derivs <- function(simtime, State, Params) {
 
   # set up to plot canal at USGS 1-8C during simulation
     par(mfrow = c(1, 1)) # reset to one graph per plot
-    plot(Start.Day,sim.Stage[1,9], 
+    plot(Start.Day,sim.Stage[1,9], # plot the initial 1-8C stage
          xlim=c(Start.Day,Stop.Day), ylim=c(3,7), col='green',
-         xlab = 'DAY', ylab = '1-8C Stage (m)')
+         xlab = 'DAY', ylab = '1-8C Stage (m)',
+         main = paste('running: ', filename))
     
   run.time <- Sys.time() # beginning timer value for run time measurement
   

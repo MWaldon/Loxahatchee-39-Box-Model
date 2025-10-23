@@ -1,0 +1,61 @@
+---
+title: "ToDo-ModelUpdate"
+author: "M. Waldon"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+1. model died at DAY=11078, Start.Day=1 Stop.DAY=11078
+    Message: Error in if (deltaS < -0.1) { : missing value where TRUE/FALSE needed
+    This is line 307 of 39BoxFunctions.R (also line 261 in 29BoxStage_OneRun.R)
+    Traceback:
+    10.
+    Qc <- RSQfact*QCalcOutS10(S10Stage,A1)*1000000 at 39BoxFunctions.R#324
+    9.
+    QoutCalc <- QoutCalcCell(S10Stage) at 39BoxStage.R#208
+    8.
+    eval(ei, envir)
+    7.
+    eval(ei, envir)
+    6.
+    withVisible(eval(ei, envir))
+    5.
+    source(model.script) at runStage.R#62
+    4.
+    eval(ei, envir)
+    3.
+    eval(ei, envir)
+    2.
+    withVisible(eval(ei, envir))
+    1.
+    source("G:/My Drive/ProjectsPapersConferences/Loxahatchee/LoxModelUpdate/39-BoxProject/Rscript/runStage.R",
+    echo = TRUE)
+    
+    
+2. edit 39BoxStageStdGraphs to make copatible with new Model.EndDate
+

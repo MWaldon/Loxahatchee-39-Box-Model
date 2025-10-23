@@ -6,7 +6,7 @@
 # remove all variables from the environment except "filename"
 rm(list = ls()[! ls() %in% "filename"])
 
-# Load the base model
+# Load the base model datasets
   # Load required dataframes created by script make_datasets.R
   if (file.exists(file="../Datasets/39-Box-Datasets.Rdata")) {
     load(file="../Datasets/39-Box-Datasets.Rdata")
@@ -14,19 +14,19 @@ rm(list = ls()[! ls() %in% "filename"])
     print('Running make_datasets.R to rebuild file 39-Box-Datasets.Rdata.')
     source('make_datasets.R')
   }
+
+  # functions 
+  source("39BoxFunctions.R") 
   
   # load the general model constants 
   source("39BoxBase.R")
-  # functions 
-  source("39BoxFunctions.R")           
-
 
 # set the name of the output file
   if (exists("filename")) { # if the variable "filename" exists
     default_name <- filename
   } else {
     default_name <- '39BoxBase' # file name for the base model run
-  }
+  } # end if else
     user_prompt <- paste("Enter output filename (default is", default_name,"): ")
   user_input <- readline(prompt = user_prompt)
   
@@ -35,7 +35,9 @@ rm(list = ls()[! ls() %in% "filename"])
     filename <- default_name
   } else {
     filename <- user_input
-  }
+  }# end if else
+  rm(default_name) # cleanup
+  
   # set title of this scenario run
   run.title <- filename
 

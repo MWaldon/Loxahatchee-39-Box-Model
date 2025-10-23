@@ -4,8 +4,13 @@
 # Model data are associated with one of 3 groups
    #    1. Cells, 2. Links, or 3. Structures
 
-library(readxl) # used to read data from Excel files
+# Make_datasets_update1.R replaces this script
+source('make_datasets_update1.R')
 
+if (FALSE) { # skip the old script
+  
+library(readxl) # used to read data from Excel files
+  
 # ____________________________________________________________
 # remove all variables from the environment
   rm(list = ls())
@@ -206,6 +211,7 @@ library(readxl) # used to read data from Excel files
   
 
   if (FALSE) { # old coding no longer used
+    # skipping mass and concentration datasets that are not yet needed
   # ************************************************************************
   
   # import structure names
@@ -365,5 +371,5 @@ library(readxl) # used to read data from Excel files
        ObsStage, TSeriesLimits,
        file="../Datasets/39-Box-Datasets.Rdata")
   
-   } # end if FLASE
-  
+   } # end if FALSE skipping mass and concentration datasets that are not yet needed
+} # end if FALSE skipping old original script  

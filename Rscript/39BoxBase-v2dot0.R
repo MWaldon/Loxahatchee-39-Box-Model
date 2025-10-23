@@ -10,7 +10,7 @@
 
 # beginning date for the model run, ending date for model run
   Start.Date <- as.Date('1995-01-01')  # first possible is as.date('1995-01-01')
-  Stop.Date  <- as.Date('2025-04-30')  #  last possible is as.Date('2025-04-30')
+  Stop.Date  <- as.Date('2009-06-30')  #  last possible is as.Date('2009-06-30')
   
 # simulation control
   CalcQRo = TRUE # TRUE # Use calculated outflow if TRUE
