@@ -1,4 +1,5 @@
-# This script contains functions used in the Loxahatchee Refuge 39-Box model.
+# This script contains functions used in the 
+#   Loxahatchee Refuge 39-Box model
 # Functions list:
   # DEPTH
   #  Cell.Depth.calc <- function(v) # returns depth(m) as a vector 1..ncell
@@ -60,6 +61,7 @@ library(plotrix)  # plotting functions
 library(matrixStats) # needed for colMin
 library(readr)    # read csv text file
 library(lubridate)# date functions
+
 
 #---------------------------DEPTH-----------------------------------------------
 Cell.Depth.calc <- function(v) { # returns depth(m) as a vector 1..ncell
@@ -190,7 +192,7 @@ QinExternal.calc <- function() { # Calculate flow boundaries for each cell
   for (DAY in seq(Start.Day,Stop.Day, 1)) {
     Day_sub <- DAY -Start.Day +1 # row subscript
     # structure inflows
-    QinExternal[DAY,1:ncanal] <- Qinfunc(DAY)  # canal cell structure inflows
+    QinExternal[Day_sub,1:ncanal] <- Qinfunc(DAY)  # canal cell structure inflows
     # precipitation
     QinExternal[Day_sub,] <- QinExternal[Day_sub,] + 
       (cell$area*PET$P[DAY]) 
@@ -473,6 +475,12 @@ USGS_Stages.read <- function() { # read historic USGS gague data for graphs
   
   USGS_Stages <- rbind(USGS_Stages, Supdate) # combine old and updated stages
   
+  # North and South gages are missing in download because they are not NGVD 29
+  # get data from USGS_Stage_Update.obs loaded by updated make_datasets.R
+  #   USGS_Stage_Update.obs ends June 30, 2025, USGS_Stages ends September 30
+  USGS_Stages$North[1:dim(USGS_Stage_Update.obs)[1]] <- USGS_Stage_Update.obs$North
+  USGS_Stages$South[1:dim(USGS_Stage_Update.obs)[1]] <- USGS_Stage_Update.obs$South
+  
   return(USGS_Stages)
 } # end USGS_Stages.read
 
@@ -480,7 +488,7 @@ USGS_Stages.read <- function() { # read historic USGS gague data for graphs
 # plot(USGS_Stages$DATE,USGS_Stages$GS8C, type='l')
 # lines(USGS_Stages$DATE, A1Floor(Date2Day(USGS_Stages$DATE)), col='red')
 
-Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gague sites
+Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gage sites
   # gagues is a vector of 1 or 2 gauges for plotting
   # cellnum is a cell number for plotting
   # globals: cell, USGS_Stages Start.Date, Stop.Date
@@ -491,7 +499,7 @@ Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gague sites
        ylab=ylabel, 
        ylim = c(4,6), xlab='Date')
   # draw a vertical line at approx. start date of current regulation schedule
-  lines(c(RSched.start,RSched.start), c(0.0,10.0), col='red')
+  lines(c(RSched.start,RSched.start), c(0.0,10.0), col='black', lty = 3)
   if(length(gauges)>1) {
     y <- subset(USGS_Stages, select = gauges[2])[[1]] # stages for 2nd gague
     lines(USGS_Stages$DATE, y, type='l', col='blue')
@@ -500,7 +508,7 @@ Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gague sites
   if (cellnum>ncanal){ nb <- cellnum } else 
                      { nb <- Canal.BF[cellnum,]$PerimCell}
   lines(USGS_Stages$DATE, rep(cell$E0[nb], length(USGS_Stages$DATE)), 
-        col='green')
+        col='green', lty = 2)
   # plot the simulated stage
   lines(as.Date((Start.Date-1):Stop.Date), sim.Stage[,cellnum], col='red')
 } # end Stage.graph
@@ -518,17 +526,17 @@ Stage.hist <- function(gauges, cellnum) { #hist of stage at USGS gague sites
        xlim = xlimit, xlab='Stage (m)',
        main = '', freq = FALSE)
   if(length(gauges)>1) {
-    y <- subset(USGS_Stages, select = gauges[2])[[1]] # stages for 2nd gague
-    hist(y, border ='blue', col = NA, 
+    y2 <- subset(USGS_Stages, select = gauges[2])[[1]] # stages for 2nd gague
+    hist(y2, border ='blue', col = NA, 
          add = TRUE, freq = FALSE)
   }
   # plot a vertical line at the soil elevation for marsh & bankfull for canal
   if (cellnum>ncanal){ nb <- cellnum } else 
                      { nb <- Canal.BF[cellnum,]$PerimCell}
   lines(rep(cell$E0[nb], 2), c(0.0, 999.),
-        col='green', lwd = 2)
+        col='green', lty = 2)
   # plot the simulated stage
-  hist(sim.Stage[,cellnum], border ='red', col = NA, 
+  hist(sim.Stage[,cellnum][!is.na(y)], border ='red', col = NA, 
        add = TRUE, freq = FALSE)
 } # end Stage.hist
 
