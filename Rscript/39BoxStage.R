@@ -72,17 +72,9 @@
   #   DT          <-DTseconds/86400. # time step (days) (not used)
   #   DTOUT       <- 1 # time interval for saving output for analysis (days)
   
-  # Approx start of current reg schedule
-  RSched.start = as.Date('1995-06-01') # useful in comparison to observed
-  
+    
   Dates <- as.Date(Start.Date:(Stop.Date+1)) # vector of simulated dates
     
-    # regulation schedule B floor stage, the B floor stage is 14 feet
-    BFloor <- 14*0.3048   # B floor (m)
-    
-    # minimum depth
-    mindepth = 0.05       # minimum depth (m), avoids division by zero
-
   # Calculated constants
       minvol = mindepth*cell$area # minimum volume
       # power law  transport coefficient
@@ -104,10 +96,11 @@ derivs <- function(simtime, State, Params) {
   # Params arguments are currently not used
   # Day_sub <- floor(simtime) +1 # subscript for matrix rows, calculated in DAY loop
   # Volume - rate of change of cell volume (m^3/day)
-    V <- State[1:ncell] # state variable estimates from ODE
-    Depth <- Cell.Depth.calc(V)
-    Stage <- cell$E0 + Depth
-    dVdt <- rep(0,ncell) # derivative of volume is net flow into cell (m^3/day)
+    V <- State[1:ncell] # cell volume state variable estimates from ODE
+    Depth <- Cell.Depth.calc(V) # cell depth (m)
+    Stage <- cell$E0 + Depth    # cell stage (m)
+    # derivative of volume is net flow into cell (m^3/day)
+    dVdt <- rep(0,ncell) # initialize derivative vector 
   # add up each component of flow in each cell
    # outflows from canal cells
      dVdt[1:ncanal] <- QoutUsed() # outflow from canal cells (negative)
@@ -130,7 +123,8 @@ derivs <- function(simtime, State, Params) {
 #_____________________________________________________________________________     
 #_____________________________________________________________________________
   # set initial conditions
-    Vinit <- Cell.Volume.calc(Einit$elev - cell$E0) # initial cell volumes
+    # initial cell volumes from initial depth = stage - cell bottom elevation
+    Vinit <- Cell.Volume.calc(Einit$elev - cell$E0) 
     #vinit <- Cell.Volume.calc(BMSimObsStage[1,15:53] - cell$E0) # for match to BM 39-Box  
 
     # set up simulation output matricies
@@ -222,7 +216,7 @@ derivs <- function(simtime, State, Params) {
   # Save output
   save(run.title, filename, sim.Volume, sim.Depth, sim.Stage,
        sim.Outflow, sim.Linkflow, sim.Velocity,
-       Start.Date, Stop.Date,
+       Start.Date, Stop.Date, Dates,
        file=paste("../Output/",filename,".Rdata", sep=""))
 #_____________________________________________________________________________
   
