@@ -28,8 +28,6 @@ Model.EndDate <-  as.Date('2025-04-29') # last possible date for model
 
 Update.StartDate <- as.Date('2009-07-01') # begin update
 
-USGS_Stages <- USGS_Stages.read() # data for the 6 USGS stage gages in Refuge
-
 A1.historic <- function(d) { 
   # return logical vector, TRUE if 1-8C stage is above A1
   # d is a vector of dates
@@ -175,14 +173,11 @@ rm(x) # cleanup
 
 # ****** may need further work to make the new data fit prior coding ****** 
 
+# updated original dataframe - data for the 6 USGS stage gages in Refuge
+USGS_Stages <- USGS_Stages.read() 
 
 # ____________________________________________________________
 # inflow & outflow dataframes
-ndays <- as.numeric(Model.EndDate) - as.numeric(Model.BaseDate) +1
-days <- 1:ndays
-dates <- Model.BaseDate+days-1
-# NAflow <- rep(NA,ndays)
-
 # import historic inflow/outflow/P/ET values (m/day)
 #   consistent structure names were used across these datasets
 # daily total inflow by structure
@@ -242,15 +237,14 @@ PET <- read_excel("../DataSets/Update_Madonna_Input/PET39.xlsx",
                 sheet = "PET", range = "E1:H5296")
 # Read extended ET
 ET.update <- read_excel("../DataSets/X09_25/ET/ET.xlsx", 
-                 sheet = "ET", range = "A5297:C11078", 
-                 col_names = FALSE)
-names(ET.update) <- c("DAY", "DATE", "ET")
+                 sheet = "ET", range = "A5297:C11079", 
+                 col_names = c("DAY", "DATE", "ET"))
 ET.update$DATE <- as.Date(ET.update$DATE)
 ET.update$ET <- ET.update$ET/1000 # convert mm/day to m/day
 # Read extended precipitation
 P.update <- read_excel("../DataSets/X09_25/Rain/Rain.xlsx", 
-              sheet = "Rain", range = "A5308:C11151", col_names = FALSE)
-names(P.update) <- c("DAY", "DATE", "P")
+              sheet = "Rain", range = "A5308:C11090", 
+              col_names = c("DAY", "DATE", "P"))
 P.update$DATE <- as.Date(P.update$DATE)
 P.update$P <- P.update$P/1000 # convert mm/day to m/day
 # update PET
@@ -316,7 +310,7 @@ save(Model.BaseDate, Model.EndDate,
    ncell, ncanal, nlink, nstruct,
    cell, link, 
    Inflow, Outflow, NonReg, PET, struct, 
-   CanalVS, Stage.Obs,
+   CanalVS, Stage.Obs, USGS_Stage_Update.obs,
    file="../Datasets/39-Box-Datasets.Rdata")
 # ____________________________________________________________
 print("39 Box Model datasets created")
@@ -326,10 +320,17 @@ print("39 Box Model datasets created")
 
 
 
-
+# ******************************************************************************
+# ******************************************************************************
 if (FALSE) { # old coding no longer used
 # ************************************************************************
-
+  
+  # ndays <- as.numeric(Model.EndDate) - as.numeric(Model.BaseDate) +1
+  # days <- 1:ndays
+  # dates <- Model.BaseDate+days-1
+  # NAflow <- rep(NA,ndays)
+  
+  
 # import structure names
 StructureNames <- read_excel("../DataSets/StructureFlow.xlsx", 
                              sheet = "Inflow", range = "C2:U2")

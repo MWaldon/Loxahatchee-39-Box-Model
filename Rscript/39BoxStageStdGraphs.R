@@ -1,16 +1,19 @@
 # plot the standard stage graphs following a model run
 
 
-# source('39BoxFunctions.R') # these are likely already loaded
+source('39BoxFunctions.R') # these are likely already loaded
 
 # Load required datasets 
   load(file="../Datasets/39-Box-Datasets.Rdata") # created by make_datasets.R
+  if (!exists("filename")) {filename <- '39BoxBase'} # set if it did not exist 
   load(file=paste("../Output/",filename,".Rdata", sep="")) # output from run
 
 # read USGS gague data for graphical comparison to simulations
 #  daily average stage by "DATE"
 #  gague names:  "GS8T"  "GS7"   "GS8C"  "GS9"   "South" "North"
   USGS_Stages <- USGS_Stages.read()
+  
+  Canal.BF <- Canal.BF.calc() # calculate canal bank full parameters
 
 # Create standard group of graphics
   par(mfrow = c(1, 2)) # side-by-side graphs on one plot

@@ -52,9 +52,10 @@ rm(list = ls()[! ls() %in% "filename"])
   #   NonReg$S39 <- 1.2*NonReg$S39 
   # Save this modified file with a new filename (i.e. not as runStage.R).
   
+  # Start.Date <- as.Date('2025-01-01')
+  # Stop.Date  <- as.Date('1995-04-30')
+
   
-
-
   
 # __________________________________________________________
 
