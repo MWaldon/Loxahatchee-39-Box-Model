@@ -59,3 +59,4 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
     
 2. edit 39BoxStageStdGraphs to make copatible with new Model.EndDate
 
+3. change to set initial stage from a date in sim.stage allow a restart 

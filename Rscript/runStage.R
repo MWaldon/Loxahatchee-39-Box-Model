@@ -55,7 +55,7 @@ rm(list = ls()[! ls() %in% "filename"])
   # Start.Date <- as.Date('2025-01-01')
   # Stop.Date  <- as.Date('1995-04-30')
 
-  
+  Start.Date <- as.Date('2020-01-01')
   
 # __________________________________________________________
 
