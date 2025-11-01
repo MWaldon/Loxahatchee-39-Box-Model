@@ -518,18 +518,28 @@ Stage.hist <- function(gauges, cellnum) { #hist of stage at USGS gague sites
   # cellnum is a cell number for plotting
   # globals: cell, USGS_Stages Start.Date, Stop.Date
   y <- subset(USGS_Stages, select = gauges[1])[[1]] # stages for 1st gague
-  ylabel <- paste(gauges, collapse = ", ") # concatenate gauge names
-  ylabel <- paste(ylabel, " stage pdf (1/m)")
-  xlimit = c(4,6)
-  hist(y, border='black', col = 'gray',
-       ylab=ylabel, 
-       xlim = xlimit, xlab='Stage (m)',
-       main = '', freq = FALSE)
+  # select period of simulation
+  y <- y[USGS_Stages$DATE>=Start.Date & USGS_Stages$DATE<=Stop.Date]
+  y <- y[! is.na(y)] # remove missing values
+  if (length(y)>30) { # skip histogram if too few values
+    ylabel <- paste(gauges, collapse = ", ") # concatenate gauge names
+    ylabel <- paste(ylabel, " stage pdf (1/m)")
+    xlimit = c(4,6)
+    hist(y, border='black', col = 'gray',
+         ylab=ylabel, 
+         xlim = xlimit, xlab='Stage (m)',
+         main = '', freq = FALSE)
+  } # end if
   if(length(gauges)>1) {
     y2 <- subset(USGS_Stages, select = gauges[2])[[1]] # stages for 2nd gague
-    hist(y2, border ='blue', col = NA, 
-         add = TRUE, freq = FALSE)
-  }
+    # select period of simulation
+    y2 <- y2[USGS_Stages$DATE>=Start.Date & USGS_Stages$DATE<=Stop.Date] 
+    y2 <- y2[! is.na(y)] # remove missing values
+    if (length(y2)>30) { # skip histogram if too few values
+      hist(y2, border ='blue', col = NA, 
+           add = TRUE, freq = FALSE)
+    } # end if
+  } # end if
   # plot a vertical line at the soil elevation for marsh & bankfull for canal
   if (cellnum>ncanal){ nb <- cellnum } else 
                      { nb <- Canal.BF[cellnum,]$PerimCell}
