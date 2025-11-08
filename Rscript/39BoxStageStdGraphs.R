@@ -36,22 +36,21 @@ source('39BoxFunctions.R') # these are likely already loaded
   par(mfrow = c(1, 1)) # reset to one graph per plot
   
 # plot water canal water velocity upstream of the USGS 1-8C gague
-  plot(Dates, sim.Velocity[,8], type='l', col='blue',
+  plot(Dates, sim.Velocity[,8,1], type='l', col='blue',
        xlab = 'Date', ylab = 'Velocity Upstream 1-8C (m/day)')
   # plot water interior water velocity cell 36 to 37
-  plot(Dates, sim.Velocity[,51], type='l', col='blue',
+  plot(Dates, sim.Velocity[,51,1], type='l', col='blue',
        xlab = 'Date', ylab = 'Interior velocity cell 36-37 (m/day)')
   
 # map minimum depth 
   # read Refuge shape files
   sf.read() # code is in 39BoxFunctions.R 
-  
-  minMarshDepth <-  colMins(sim.Depth)[(ncanal+1):ncell]
-  meanMarshDepth <- colMeans(sim.Depth)[(ncanal+1):ncell]
-  maxMarshDepth <-  colMaxs(sim.Depth)[(ncanal+1):ncell]
+  minMarshDepth <-  colMins(sim.Depth.da)[(ncanal+1):ncell]
+  meanMarshDepth <- colMeans(sim.Depth.da)[(ncanal+1):ncell]
+  maxMarshDepth <-  colMaxs(sim.Depth.da)[(ncanal+1):ncell]
 
   marsh.map(minMarshDepth,  maptitle="Minimum Simulated Marsh Depth (m)")
   marsh.map(meanMarshDepth, maptitle="Mean Simulated Marsh Depth (m)")
   marsh.map(maxMarshDepth,  maptitle="Maximum Simulated Marsh Depth (m)")
   
-  
+   

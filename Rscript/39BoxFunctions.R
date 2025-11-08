@@ -403,18 +403,20 @@ link2cell <- function(F) { # Link flows or mass transport
 
 sim.Velocity.calc <- function() { # link water velocity calculation
   #  velocity (m/day) = discharge (m^3/day) / cross section area (m^2)
-  #  globals: sim.Linkflow, link, sim.Depth, nlink
+  #  globals: sim.Linkflow, link, sim.Depth, nlink, nr,nX
   # create matricies with the same dimensions as sim.Linkflow
-  A <- matrix(NA, nrow = dim(sim.Linkflow)[1], ncol = dim(sim.Linkflow)[2])
+  A <- array(data=NA, dim=c(nr, nlink, nX)) # same as sim.Linkflow
   v <- A
   for (i in 1:nlink) { # for each link calculate the vector of daily velocities 
     # u <- link$up[i]  # not used
     d <- link$dn[i]    # downstream cell number
     w <- link$Width[i] 
-    # cross sectional area A is depth*width
-    A[,i] <- sim.Depth[,d]*w # using downstream depth for area
-    v[,i] <- sim.Linkflow[,i]/A[,i]   # velocity v = Q/A (m/day)
-  } # end for 
+    for (j in 1:nX) {
+      # cross sectional area A is depth*width
+      A[,i,j] <- sim.Depth[,d,j]*w # using downstream depth for area
+      v[,i,j] <- sim.Linkflow[,i,j]/A[,i,j]   # velocity v = Q/A (m/day)
+    } # end for j
+  } # end for i
   return(v)
 } # end sim.Velocity.calc
 
@@ -510,7 +512,7 @@ Stage.graph <- function(gauges, cellnum) { #plot of stage at USGS gage sites
   lines(USGS_Stages$DATE, rep(cell$E0[nb], length(USGS_Stages$DATE)), 
         col='green', lty = 2)
   # plot the simulated stage
-  lines(as.Date((Start.Date-1):Stop.Date), sim.Stage[,cellnum], col='red')
+  lines(as.Date(Start.Date:Stop.Date), sim.Stage.da[,cellnum], col='red')
 } # end Stage.graph
 
 Stage.hist <- function(gauges, cellnum) { #hist of stage at USGS gague sites
@@ -546,7 +548,7 @@ Stage.hist <- function(gauges, cellnum) { #hist of stage at USGS gague sites
   lines(rep(cell$E0[nb], 2), c(0.0, 999.),
         col='green', lty = 2)
   # plot the simulated stage
-  hist(sim.Stage[,cellnum][!is.na(y)], border ='red', col = NA, 
+  hist(sim.Stage.da[,cellnum][!is.na(y)], border ='red', col = NA, 
        add = TRUE, freq = FALSE)
 } # end Stage.hist
 

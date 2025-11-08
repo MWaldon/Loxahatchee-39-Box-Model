@@ -1,0 +1,91 @@
+---
+title: "Loxahatchee 39 Box Stage Model"
+output: html_notebook
+---
+This markdown file runs a user defined model scenario for the 39 Box Stage Model.
+  If you modify this markdown file, save the modified file with a new filename 
+  (i.e. not as runStage.Rmd).
+
+Set the run output file name and run title in the following code chunk:
+```{r echo=FALSE}
+  if (exists('filename')) { rm(filename) } # remove old filename if it exists
+  # if you don't set filename on the next line it will be given 
+  #   the default value '39BoxBase'
+  # filename <- 'deleteme' # for example
+```
+
+Run the initial scripts to set up the model run:
+```{r echo=FALSE, results = 'markup'}
+# remove all variables from the environment except "filename"
+rm(list = ls()[! ls() %in% "filename"])
+
+# (NOTE: Use command dev.off() in the console to reset the plot window to 
+# default settings and clear all plots)
+
+# Load the base model datasets, recreate it if it does not already exist
+  # Load required dataframes created by script make_datasets.R
+  if (file.exists(file="../Datasets/39-Box-Datasets.Rdata")) {
+    load(file="../Datasets/39-Box-Datasets.Rdata")
+  } else {
+    print('Running make_datasets.R to rebuild file 39-Box-Datasets.Rdata.')
+    source('make_datasets.R')
+  }
+
+  # load the model functions 
+  source("39BoxFunctions.R") 
+  
+  # load the general model constants 
+  source("39BoxBase.R")
+
+# set the name of the output file
+  # if the name was not set then use '39BoxBase'
+  if (! exists("filename")) { # if the variable "filename" exists
+    filename <- '39BoxBase' # file name for the base model run
+  } # end if
+
+  # set title of this scenario run
+  run.title <- filename
+  
+```
+
+Make any user defined changes to the model parameters in the following code chunk.
+This may alter constants, loaded dataframes, or redefine functions.
+
+Example: Model the impact of increasing water supply flow through the S39 by 20%
+
+      NonReg$S39 <- 1.2*NonReg$S39
+
+Example: Set new model run start and stop dates
+
+      Start.Date <- as.Date('2025-01-01')
+      
+      Stop.Date  <- as.Date('1995-04-30')
+
+```{r}
+
+  # Start.Date <- as.Date('2025-01-01')  # set an alternative start or stop date
+  # Stop.Date  <- as.Date('1995-04-30')
+  # nX <- 1 # run with output only at the end of the day
+
+```
+
+
+The following code chunk runs the model.
+  Note: This may take a long time. The model is running if a red button is 
+        visible at the top right of the chunk.
+```{r}
+  model.script <- "39BoxStage.R"
+  source(model.script)
+  print('model run finished')
+```
+
+
+```{r}
+# run a standard set of graphics 
+  source('39BoxStageStdGraphs.R')
+
+# __________________________________________________________  
+# On the following lines add any user defined final statistical calculations, or graphics
+  
+ 
+```

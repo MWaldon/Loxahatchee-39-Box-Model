@@ -12,6 +12,9 @@
   Start.Date <- as.Date('1995-01-01')  # first possible is as.date('1995-01-01')
   Stop.Date  <- as.Date('2025-04-30')  #  last possible is as.Date('2025-04-30')
   
+# temporal resolution - set the number of times per day to save cell volume
+  nX <- 12 # (saves per day), save once every 24/nX hours
+  
 # simulation control
   CalcQRo = TRUE # TRUE # Use calculated outflow if TRUE
   RSQfact = 1    # Factor multiplying calculated output (dimensionless)

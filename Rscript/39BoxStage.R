@@ -127,39 +127,46 @@ derivs <- function(simtime, State, Params) {
     Vinit <- Cell.Volume.calc(Einit$elev - cell$E0) 
     #vinit <- Cell.Volume.calc(BMSimObsStage[1,15:53] - cell$E0) # for match to BM 39-Box  
 
+    # times during the single day simulation to save output
+    sim.tout <- data.frame(dy = (0:nX)/nX) # decimal days of save times
+    sim.tout$hr <- sim.tout$dy*24  # decimal hours of save times
+    
     # set up simulation output matricies
     nr <- Stop.Day-Start.Day+2 # number of rows
-    sim.Volume  <- matrix(data = NA, nrow = nr, ncol = ncell)
-    sim.Depth   <- matrix(data = NA, nrow = nr, ncol = ncell)
-    sim.Stage   <- matrix(data = NA, nrow = nr, ncol = ncell)
-    sim.Outflow <- matrix(data = NA, nrow = nr, ncol = ncanal)
-    sim.Linkflow<- matrix(data = NA, nrow = nr, ncol = nlink)
-    # set up output sim time dataframe
+    # subscripts represent day, cell/link, and time
+    sim.Volume  <- array(data=NA, dim=c(nr, ncell, nX))
+    sim.Depth   <- array(data=NA, dim=c(nr, ncell, nX))
+    sim.Stage   <- array(data=NA, dim=c(nr, ncell, nX))
+    # outflow is only from the ncanal canal cells
+    sim.Outflow <- array(data=NA, dim=c(nr, ncanal, nX)) 
+    sim.Linkflow<- array(data=NA, dim=c(nr, nlink, nX))
+    # set up output sim time dataframe - time from start of simulation
     sim.time <- data.frame(time = as.numeric(0:(Stop.Day-Start.Day+1)),
                            DAY = Start.Day:(Stop.Day+1))
     sim.time$DATE <- Day2Date(sim.time$DAY)
+    # subscript for inflow/outflow/PETarrays (this is equal to sim.time$DAY)
     sim.time$sub  <- as.integer(sim.time$DATE - Model.BaseDate +1)
     
     # fill the initial row of the simulation output matricies
-    sim.Volume[1,]   <- Vinit
-    sim.Depth[1,]    <- Cell.Depth.calc(Vinit)
-    sim.Stage[1,]    <- sim.Depth[1,] + cell$E0
+    sim.Volume[1, ,1]   <- Vinit
+    sim.Depth[1, ,1]    <- Cell.Depth.calc(Vinit)
+    sim.Stage[1, ,1]    <- sim.Depth[1, ,1] + cell$E0
     Qout <- QoutHistoric(Start.Day) # historic outflow
     # calculate S10 regulatory outflow
-    S10Stage <- sim.Stage[1,9] # Stage[9] # calculate using stage at 1-8C
+    S10Stage <- sim.Stage[1, 9, 1] # calculate using stage at 1-8C
     DAY <- Start.Day
     A1 <- A1Floor(DAY) # regulation schedule A1 stage used by QCalcOutS10
     QoutCalc <- QoutCalcCell(S10Stage)
-    sim.Outflow[1,]  <- QoutUsed() # outflow from canal cells (negative)
-    sim.Linkflow[1,] <- Link.Flow.calc(sim.Depth[1,], sim.Stage[1,]) # link flow
+    sim.Outflow[1, ,1]  <- QoutUsed() # outflow from canal cells (negative)
+    sim.Linkflow[1, ,1] <- Link.Flow.calc(sim.Depth[1, ,1], sim.Stage[1, ,1])
   # calculate inflow boundary condition for each cell for each day of simulation
     #   as matrix of all external inflows to each cell on each day.
     # QinExternal is a matrix nrow = Stop.Day-Start.Day+1, ncol = ncell
-  QinExternal <- QinExternal.calc() # cell inflows + precip (m^3/day)
+    QinExternal <- QinExternal.calc() # cell inflows + precip (m^3/day)
 
   # set up to plot canal at USGS 1-8C during simulation
     par(mfrow = c(1, 1)) # reset to one graph per plot
-    plot(Start.Day,sim.Stage[1,9], # plot the initial 1-8C stage
+    plot(Start.Day,sim.Stage[1,9,1], # plot the initial 1-8C stage
          xlim=c(Start.Day,Stop.Day), ylim=c(3,7), col='green',
          xlab = 'DAY', ylab = '1-8C Stage (m)',
          main = paste('running: ', filename))
@@ -169,54 +176,86 @@ derivs <- function(simtime, State, Params) {
   # Loop through the days from start to stop
   for (DAY in seq(Start.Day,Stop.Day, 1)) {
     TIME <- DAY-1
-    t0   <- DAY - Start.Day # simulation time at start of this day
-    t1   <- t0+1            # simulation time at end of this day
-    Day_sub <- t1           # matrix row subscript 
-    t2   <- t1+1           # used as matrix index for result storage 
+    # t0, t1, t2 are times beginning at zero on Start.Day
+    t0   <- DAY - Start.Day # simulation time at start of this day (0, 1, 2,...)
+    t1   <- t0+1            # simulation time at end of this day (1,2,3,...)
+    # Day_sub <- t1           # matrix row subscript for QinExternal ...
+    t2   <- t1+1           # used as matrix index for result storage (2,3,4,...)
     A1 <- A1Floor(DAY) # regulation schedule A1 stage used by QCalcOutS10  
-    # Qin <- Qinfunc(DAY)  # canal cell inflows (m^3/d)
-    Qin <- QinExternal[t1,]  # cell structure inflows+ precip (m^3/d)
+    Qin <- QinExternal[t1,]  # cell structure inflows + precip (m^3/d)
     Qout <- QoutHistoric(DAY) # historic outflow
-    # calculate S10 regulatory outflow
-    S10Stage <- sim.Stage[t1,9] # Stage[9] # calculate using stage at 1-8C
+    # calculate S10 regulatory outflow from initial 1-8C stage
+    S10Stage <- sim.Stage[t1, 9, 1] # Stage[9] # calculate using stage at 1-8C
     QoutCalc <- QoutCalcCell(S10Stage)
 
     # run the simulation for 1 day
-    state1 <-  # ode(Vinit, (0:1), derivs, DAY)
-      #lsoda(Vinit, (0:1), derivs, 0, # rtol = 1e-2, 
+    state1 <-  # ode(Vinit, sim.tout$dy, derivs, DAY)
+      #lsoda(Vinit, sim.tout$dy, derivs, 0, # rtol = 1e-2, 
       #     atol = 50000, hini = 0.0, verbose = FALSE, tcrit = 1.0)
-       radau(Vinit, (0:1), derivs, 0, 
+       radau(Vinit, sim.tout$dy, derivs, 0, 
              atol = 1000)
-      # state1 is a 2 by (ncell+1) matrix with columns for time & cell volume 
+      # state1 is a (nX+1) by (ncell+1) matrix with columns for time & cell volume 
       # state1[,1] first column is simulation time
-      # state1[1,2:(ncell+1)] is initial cell volume
-      # state1[2,2:(ncell+1)] is final cell volume
-    # reset the initial condition to final value
-    Vinit <- state1[2,2:(ncell+1)] # cell volumes at end of 1-day simulation
+      # state1[1,2:(ncell+1)] is initial cell volumes
+      # state1[nX+1,2:(ncell+1)] is final cell volumes
+    # setup for next step, reset the initial condition to current final value
+    Vinit <- state1[nX+1,2:(ncell+1)] # cell volumes at end of 1-day simulation
     
-    # save the result - fill the next row of the simulation output matricies
-    sim.Volume[t2,]   <- Vinit # save the cell volumes at time t2 (day t1)
-    sim.Depth[t2,]    <- Cell.Depth.calc(Vinit) 
-    sim.Stage[t2,]    <- sim.Depth[t2,] + cell$E0
-    S10Stage <- sim.Stage[t2,9] # Stage[9] # calculate using stage at 1-8C
-    QoutCalc <- QoutCalcCell(S10Stage) # note A1 is unchanged
-    sim.Outflow[t2,]  <- QoutUsed() # outflow from canal cells (negative)
-    sim.Linkflow[t2,] <- Link.Flow.calc(sim.Depth[t2,], sim.Stage[t2,]) # link flow
+    # *** delete*** S10Stage <- sim.Stage[t2, 9, 1] # calculate using initial stage at 1-8C
+    # save intermediate results - fill rows/slices of the simulation output matricies
+    for (i in 1:(nX+1)) {
+      if (i <= nX) { # then save to the current step
+        ti <- t1
+        ii <- i
+      }
+      else { # final value should initialize next step
+        ti <- t2
+        ii <- 1
+      }
+      sim.Volume[ti, ,ii] <- state1[i,2:(ncell+1)]
+      sim.Depth[ti, ,ii]  <- Cell.Depth.calc(sim.Volume[ti, ,ii])
+      sim.Stage[ti, ,ii]  <- sim.Depth[ti, ,ii] + cell$E0
+      # save flows
+      # note structure outflows are here unchanged during the day
+      #      this code allows for future scenarios in which it is variable
+      QoutCalc <- QoutCalcCell(S10Stage) # note unchanged throughout the day
+      sim.Outflow[ti, ,ii] <- QoutUsed()  # uses Qout and QoutCalc
+      sim.Linkflow[ti, ,ii] <- Link.Flow.calc(sim.Depth[ti, ,ii], 
+                                              sim.Stage[ti, ,ii]) # link flow
+    } # end for i
     
     # signal the end of the loop
-    points(DAY,sim.Stage[t2,9], col = 'red')
+    points(DAY,sim.Stage[t2,9,1], col = 'red')
+    if (yday(Day2Date(DAY))==1) { # print year if it is January 1
+      cat(paste0('\r starting year ', year(Day2Date(DAY))))
+    }
   } # end for DAY loop
-  sim.Velocity <- sim.Velocity.calc() # calculate link velocities matrix
   
-  run.time <- Sys.time() - run.time
-  print(run.time)
+  # Final calculations
   
+    # calculate link velocities matrix
+    sim.Velocity <- sim.Velocity.calc() # calculate link velocities matrix
+    
+    # calculate the daily averages
+    sim.Stage.da <- apply(sim.Stage[1:(nr-1), , ], c(1, 2), mean)
+    sim.Depth.da <- apply(sim.Depth[1:(nr-1), , ], c(1, 2), mean) 
+    
+    # time for execution of the model
+    run.time <- Sys.time() - run.time 
+    print(' ') # finish the previous line
+    print(run.time)
+    
 # end of model run
 #_____________________________________________________________________________
-  # Save output
-  save(run.title, filename, sim.Volume, sim.Depth, sim.Stage,
-       sim.Outflow, sim.Linkflow, sim.Velocity,
-       Start.Date, Stop.Date, Dates,
+  # Save output - save variables used to calculate constituent mass balance
+  save(run.title, filename, # run identifiers 
+       Start.Date, Stop.Date, Dates, sim.time, # run parameters
+       nX, CalcQRo, Eb,
+       sim.Volume, sim.Depth, sim.Stage, # state related
+       sim.Outflow, sim.Linkflow, Inflow, # flows needed for mass balance
+       Outflow, PET, 
+       ETmin, Het, lseep, rseep, RSQfact, mindepth, # model parameters
+       sim.Velocity, # particle tracking
        file=paste("../Output/",filename,".Rdata", sep=""))
 #_____________________________________________________________________________
   
